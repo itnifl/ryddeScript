@@ -30,6 +30,34 @@ Function CanDeletePath(candidatePath, allowedRoot)
 	End If
 End Function
 
+Function IsPathProtected(candidatePath, protectedRoot)
+	Dim candidate, protected
+	candidate = NormalizePathForComparison(candidatePath)
+	protected = NormalizePathForComparison(protectedRoot)
+
+	IsPathProtected = True
+	If Len(candidate) = 0 Or Len(protected) = 0 Then Exit Function
+	If IsSameOrChildPath(candidate, protected) Then Exit Function
+	If IsSameOrChildPath(protected, candidate) Then Exit Function
+	IsPathProtected = False
+End Function
+
+Function IsSameOrChildPath(candidatePath, rootPath)
+	Dim candidate, root
+	candidate = NormalizePathForComparison(candidatePath)
+	root = NormalizePathForComparison(rootPath)
+
+	IsSameOrChildPath = False
+	If Len(candidate) = 0 Or Len(root) = 0 Then Exit Function
+	If candidate = root Then
+		IsSameOrChildPath = True
+	ElseIf IsDriveRoot(root) Then
+		IsSameOrChildPath = (Left(candidate, Len(root)) = root)
+	Else
+		IsSameOrChildPath = (Left(candidate, Len(root) + 1) = root & "\")
+	End If
+End Function
+
 Function IsOlderThanDays(modifiedAt, referenceAt, minimumDays)
 	IsOlderThanDays = (DateDiff("d", CDate(modifiedAt), CDate(referenceAt)) >= CLng(minimumDays))
 End Function

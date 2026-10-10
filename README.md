@@ -17,13 +17,17 @@ The script is organized as a sequential cleanup workflow. Its main concepts are:
 
 - **Discovery:** inspect the Windows version, architecture, registry, filesystem, and installed server roles before deciding whether a cleanup step applies.
 - **Retention rules:** identify selected temporary files, dumps, logs, and folders by age, size, name, or location.
+- **Repository protection:** reject deletion of the repository itself, anything inside it, or any ancestor directory containing it.
 - **Windows maintenance tools:** invoke utilities such as Disk Cleanup, DISM, `compact`, `powercfg`, and `vssadmin`.
 - **Modern Windows caches:** include Delivery Optimization files and the DirectX shader cache through Windows Disk Cleanup.
+- **Current-user temporary files:** remove top-level files and folders from `%TEMP%` only after they are at least seven days old.
 - **Server-role cleanup:** handle generic IIS, Exchange, and WSUS log or maintenance locations when present.
 - **Logging and reporting:** record attempted actions and compare free disk space before and after execution.
 - **Elevation:** relaunch through `cscript.exe` with administrative rights when required.
 
 Environment-specific product paths, private deployment conventions, personal names, credentials, machine names, and organization-specific cleanup rules are intentionally excluded from the public version.
+
+All direct file and folder deletions pass through a single repository-protection boundary. The boundary rejects the repository, its contents, ancestor folders, wildcard file deletions, and filesystem reparse points. Folder trees are traversed item by item without following junctions. Runtime logs are stored under `%ProgramData%\ryddeScript\Logs`, not in the checkout, and only logs created by ryddeScript are rotated. Third-party cleaners are not launched because their configured deletion scope cannot be verified by this script.
 
 ### Important safety warning
 
@@ -85,7 +89,7 @@ The project is available under the [MIT License](LICENSE). Anyone may use, copy,
 
 **«Rydde» betyr å ordne eller gjøre rent. `ryddeScript` betyr derfor «ryddeskript».**
 
-Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det finner utvalgte midlertidige filer, logger og andre diskplasskrevende data. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/execute` må oppgis for å kjøre oppryddingen.
+Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det beskytter repoet og mapper som inneholder det, og kan rydde midlertidige filer som er eldre enn sju dager. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/execute` må oppgis for å kjøre oppryddingen.
 
 Skriptet kan slette filer, profildata, skyggekopier, gjenopprettingspunkter og installasjonsbuffere. Det er historisk kode og er **ikke trygt å kjøre som publisert**. Les hele kildekoden, innfør en reell tørrkjøringsmodus, ta sikkerhetskopi og test i en midlertidig virtuell maskin først.
 
