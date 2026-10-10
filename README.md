@@ -1,10 +1,17 @@
 # ryddeScript
 
+## Table of contents
+
+- [English](#english)
+- [Norwegian (short version)](#norsk-kortversjon)
+
+## English
+
 **“Rydde” is Norwegian for “tidy up” or “clean up”, so `ryddeScript` means “cleanup script”.**
 
 `ryddeScript` is a legacy VBScript from 2015 that explores automated cleanup of Windows workstations and servers. It inventories common sources of disk usage, applies age- and size-based retention rules, logs its work, and invokes built-in Windows maintenance tools.
 
-## What the script does
+### What the script does
 
 The script is organized as a sequential cleanup workflow. Its main concepts are:
 
@@ -17,7 +24,7 @@ The script is organized as a sequential cleanup workflow. Its main concepts are:
 
 Environment-specific product paths, private deployment conventions, personal names, credentials, machine names, and organization-specific cleanup rules are intentionally excluded from the public version.
 
-## Important safety warning
+### Important safety warning
 
 This is historical code, not a production-ready cleanup utility. It performs broad and potentially destructive actions, including deleting files, user-profile data, shadow copies, restore points, and installer caches. Some logic targets Windows and server products that are now old.
 
@@ -31,14 +38,14 @@ Do not run it on a real machine without first:
 
 The repository currently preserves the legacy implementation for review and modernization. It should be considered unsafe to execute as published.
 
-## Repository contents
+### Repository contents
 
 - `ryddeScript.vbs` — sanitized legacy cleanup script.
 - `lib/RyddeDecisions.vbs` — side-effect-free safety and retention decisions used by the legacy script.
 - `tests/` — decision-unit, publication, and parser tests.
 - `LICENSE` — MIT License; use and modification are permitted without warranty.
 
-## Tests
+### Tests
 
 The test suite is intentionally non-destructive. It exercises pure decision helpers and validates the public source without running the cleanup workflow:
 
@@ -49,7 +56,7 @@ cscript.exe //nologo tests/RyddeDecisions.Tests.vbs
 
 GitHub Actions runs both commands for every pull request and every push to `main`. The `Tests` check is required by branch protection, so a failing test prevents the pull request from being merged.
 
-## Historical invocation
+### Historical invocation
 
 After a complete code and safety review, the legacy script would be invoked from an elevated command prompt with:
 
@@ -59,10 +66,20 @@ cscript //nologo ryddeScript.vbs
 
 This command is documentation of the original interface, not a recommendation to execute the current script.
 
-## Recommended modernization
+### Recommended modernization
 
 A safer successor should be split into small operations, make dry-run behavior the default, require explicit opt-in for every destructive category, validate deletion boundaries, avoid following reparse points, and expose testable decision logic separately from filesystem and registry changes.
 
-## License and responsibility
+### License and responsibility
 
 The project is available under the [MIT License](LICENSE). Anyone may use, copy, modify, merge, publish, distribute, sublicense, or sell copies. The software is provided “as is”, without warranty; users are responsible for reviewing, testing, and operating it safely.
+
+## Norsk (kortversjon)
+
+**«Rydde» betyr å ordne eller gjøre rent. `ryddeScript` betyr derfor «ryddeskript».**
+
+Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det finner utvalgte midlertidige filer, logger og andre diskplasskrevende data, og bruker regler for alder og størrelse før opprydding.
+
+Skriptet kan slette filer, profildata, skyggekopier, gjenopprettingspunkter og installasjonsbuffere. Det er historisk kode og er **ikke trygt å kjøre som publisert**. Les hele kildekoden, innfør en reell tørrkjøringsmodus, ta sikkerhetskopi og test i en midlertidig virtuell maskin først.
+
+Testene er ikke-destruktive og kjøres automatisk for pull requests. Prosjektet bruker [MIT-lisensen](LICENSE), uten garanti; brukeren har selv ansvar for sikker bruk.

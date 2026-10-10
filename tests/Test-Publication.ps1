@@ -43,6 +43,14 @@ Assert-True ($scriptText.Contains('CanDeletePath(folder.Path, oLocation.Path)'))
 Assert-True ($scriptText.Contains('folder.Attributes And 1024')) 'Profile deletion does not reject reparse points'
 Assert-True ($readmeText -match '(?i)tidy up.+clean up') 'README does not translate the project name'
 Assert-True ($readmeText -match '(?i)unsafe to execute') 'README does not clearly warn against execution'
+Assert-True ($readmeText -match '(?m)^## Table of contents$') 'README is missing its English table of contents'
+Assert-True ($readmeText.Contains('[English](#english)')) 'README table of contents does not link to the English version'
+Assert-True ($readmeText.Contains('[Norwegian (short version)](#norsk-kortversjon)')) 'README table of contents does not link to the Norwegian version'
+$englishIndex = $readmeText.IndexOf('## English', [StringComparison]::Ordinal)
+$norwegianIndex = $readmeText.IndexOf('## Norsk (kortversjon)', [StringComparison]::Ordinal)
+Assert-True ($englishIndex -ge 0) 'README is missing the English version'
+Assert-True ($norwegianIndex -ge 0) 'README is missing the short Norwegian version'
+Assert-True (($englishIndex -ge 0) -and ($norwegianIndex -gt $englishIndex)) 'The English version must appear before the Norwegian version'
 Assert-True ($licenseText.StartsWith('MIT License')) 'LICENSE is not the MIT License'
 Assert-True ($licenseText -match 'THE SOFTWARE IS PROVIDED "AS IS"') 'License warranty disclaimer is missing'
 
