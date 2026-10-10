@@ -1,4 +1,4 @@
-''Version 1.496-public
+''Version 1.497-public
 
 ' ryddeScript means "cleanup script" in Norwegian.
 ' This public legacy edition contains only generic Windows and server-role logic.
@@ -14,11 +14,13 @@ On Error Resume Next
 
 Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogRoot, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
 Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore, sCurrentProfileName
-Dim versionInfo, executionEnabled, relaunchArguments, sProtectedRoot
-versionInfo = "1.496-public"
+Dim versionInfo, executionEnabled, ccleanerEnabled, relaunchArguments, sProtectedRoot
+versionInfo = "1.497-public"
 executionEnabled = WScript.Arguments.Named.Exists("execute")
+ccleanerEnabled = WScript.Arguments.Named.Exists("ccleaner")
 relaunchArguments = ""
 If executionEnabled Then relaunchArguments = " /execute"
+If ccleanerEnabled Then relaunchArguments = relaunchArguments & " /ccleaner"
 
 oDate = date()
 strDate = CDate(oDate)
@@ -224,8 +226,12 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	8. Do not run third-party cleaners with unverified configuration.
-oFile.WriteLine "Skipping third-party cleanup tools; their deletion scope cannot be verified."
+'	8. Run CCleaner only after explicit /execute /ccleaner opt-in.
+If ccleanerEnabled Then
+	RunOptionalCCleaner
+Else
+	oFile.WriteLine "Skipping CCleaner; use /execute /ccleaner to opt in."
+End If
 '	Show Progress as dots:
 DisplayProgress(1)
 Err.Clear
@@ -1002,7 +1008,7 @@ End Sub
 Sub forceAsAdmin
 	If WScript.Arguments.Named.Exists("elevated") = False Then 
 		'oShell.Popup "Scriptet ble ikke startet som admin. Starter igjen med cscript og som admin...",3,"Manglende admin"
-		CreateObject("Shell.Application").ShellExecute WScript.Path & "\cscript.exe", """" & WScript.ScriptFullName & """ /elevated /execute", "", "runas", 1
+		CreateObject("Shell.Application").ShellExecute WScript.Path & "\cscript.exe", """" & WScript.ScriptFullName & """ /elevated" & relaunchArguments, "", "runas", 1
 		WScript.Quit 0
 	End If
 End Sub
@@ -1059,6 +1065,8 @@ Sub PrintExecutionPlan
 	WScript.Echo "WARNING: /execute enables the complete destructive legacy workflow."
 	WScript.Echo "Review the source, backups, and target machine before using:"
 	WScript.Echo "  cscript //nologo ryddeScript.vbs /execute"
+	WScript.Echo "Optional CCleaner Custom Clean:"
+	WScript.Echo "  cscript //nologo ryddeScript.vbs /execute /ccleaner"
 End Sub
 Function ReadReg(RegPath)
 	On Error Resume Next
@@ -1168,6 +1176,32 @@ Sub CleanOldMatchingFilesInFolder(folderPath, namePrefix, minimumDays)
 			End If
 		End If
 	Next
+End Sub
+
+Sub RunOptionalCCleaner
+	Dim candidates, candidate, ccleanerPath, returnCode
+	candidates = Array( _
+		oShell.ExpandEnvironmentStrings("%ProgramFiles%\CCleaner\CCleaner64.exe"), _
+		oShell.ExpandEnvironmentStrings("%ProgramFiles%\CCleaner\CCleaner.exe"), _
+		oShell.ExpandEnvironmentStrings("%ProgramFiles(x86)%\CCleaner\CCleaner.exe") _
+	)
+	ccleanerPath = ""
+	For Each candidate In candidates
+		If oFSO.FileExists(candidate) Then
+			ccleanerPath = candidate
+			Exit For
+		End If
+	Next
+
+	If Len(ccleanerPath) = 0 Then
+		oFile.WriteLine "CCleaner was requested but no supported executable was found."
+		Exit Sub
+	End If
+
+	oFile.WriteLine "WARNING: Running CCleaner Custom Clean with its saved options."
+	oFile.WriteLine "CCleaner's configured includes are outside ryddeScript repository protection."
+	returnCode = oShell.Run("""" & ccleanerPath & """ /AUTO", 1, True)
+	oFile.WriteLine "CCleaner completed with exit code " & returnCode & "."
 End Sub
 
 Sub LoadLibrary(libraryPath)

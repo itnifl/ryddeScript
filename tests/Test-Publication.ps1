@@ -45,6 +45,7 @@ Assert-True ($scriptText.Contains('IsProtectedProfileName(folder.Name, sCurrentP
 Assert-True ($scriptText.Contains('CanDeletePath(folder.Path, oLocation.Path)')) 'Profile deletion does not enforce an allowed-root boundary'
 Assert-True ($scriptText.Contains('folder.Attributes And 1024')) 'Profile deletion does not reject reparse points'
 Assert-True ($scriptText.Contains('WScript.Arguments.Named.Exists("execute")')) 'Destructive execution is not protected by an explicit /execute switch'
+Assert-True ($scriptText.Contains('WScript.Arguments.Named.Exists("ccleaner")')) 'CCleaner does not require an explicit /ccleaner switch'
 Assert-True ($scriptText.Contains('If Not executionEnabled Then')) 'The script does not default to preview-only mode'
 Assert-True ($scriptText.Contains('Delivery Optimization Files')) 'Modern Delivery Optimization cleanup is not configured'
 Assert-True ($scriptText.Contains('DirectX Shader Cache')) 'Modern DirectX shader-cache cleanup is not configured'
@@ -55,7 +56,10 @@ Assert-True ([regex]::Matches($scriptText, 'oFSO\.DeleteFile').Count -eq 1) 'A f
 Assert-True ([regex]::Matches($scriptText, 'oFSO\.DeleteFolder').Count -eq 1) 'A folder deletion bypasses SafeDeleteFolder'
 Assert-True (-not ($scriptText -match '(?im)^\s*[A-Za-z][A-Za-z0-9]*\.Delete\s')) 'An object deletion bypasses the repository-protection wrappers'
 Assert-True (-not ($scriptText -match '(?i)\brmdir\b')) 'A shell folder deletion bypasses repository protection'
-Assert-True (-not ($scriptText -match '(?i)CCleaner\.exe.+/AUTO')) 'Unbounded third-party cleanup is enabled'
+Assert-True ($scriptText.Contains('If ccleanerEnabled Then')) 'CCleaner invocation is not guarded by its opt-in switch'
+Assert-True ($scriptText.Contains('Sub RunOptionalCCleaner')) 'Optional CCleaner runner is missing'
+Assert-True ($scriptText.Contains('ccleanerPath & """ /AUTO')) 'CCleaner does not use its documented automatic Custom Clean command'
+Assert-True ($scriptText.Contains('""" /elevated" & relaunchArguments')) 'Cleanup options are not preserved during elevation'
 Assert-True ($scriptText.Contains('ExpandEnvironmentStrings("%ProgramData%")')) 'Runtime logs are not stored under ProgramData'
 Assert-True ($scriptText.Contains('LCase(Left(file.Name, 9)) = "ryddelog-"')) 'Log rotation is not restricted to ryddeScript logs'
 Assert-True ($scriptText.Contains('InStr(candidatePath, "*")')) 'Deletion wrapper does not reject wildcard paths'
@@ -79,6 +83,10 @@ $previewOutput = & cscript.exe //nologo $scriptPath 2>&1 | Out-String
 Assert-True ($LASTEXITCODE -eq 0) 'Default preview returned a failure exit code'
 Assert-True ($previewOutput -match '(?i)preview only') 'Default invocation did not display preview mode'
 Assert-True ($previewOutput -match '(?i)no files, registry values, services, or system settings were changed') 'Default preview did not confirm that it made no system changes'
+
+$ccleanerPreviewOutput = & cscript.exe //nologo $scriptPath /ccleaner 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 0) 'CCleaner without /execute returned a failure exit code'
+Assert-True ($ccleanerPreviewOutput -match '(?i)preview only') 'The /ccleaner switch bypassed preview-only mode without /execute'
 
 $temporaryScript = Join-Path ([IO.Path]::GetTempPath()) ("ryddeScript-syntax-{0}.vbs" -f [guid]::NewGuid())
 try {
