@@ -1,12 +1,12 @@
-''Version 1.494-public
+''Version 1.495-public
 
 ' ryddeScript means "cleanup script" in Norwegian.
 ' This public legacy edition contains only generic Windows and server-role logic.
 ' Environment-specific product paths, private deployment conventions, personal
 ' names, and organization-specific cleanup rules have been removed.
 '
-' WARNING: This historical script performs destructive cleanup and is not safe
-' to run on a production machine without a complete review and a real dry-run mode.
+' WARNING: This historical script performs destructive cleanup when /execute is
+' supplied. The default preview changes nothing, but execution still requires review.
 '
 ''Kode begynner her:
 Option Explicit
@@ -14,8 +14,11 @@ On Error Resume Next
 
 Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
 Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore, sCurrentProfileName
-Dim versionInfo
-versionInfo = "1.494-public"
+Dim versionInfo, executionEnabled, relaunchArguments
+versionInfo = "1.495-public"
+executionEnabled = WScript.Arguments.Named.Exists("execute")
+relaunchArguments = ""
+If executionEnabled Then relaunchArguments = " /execute"
 
 oDate = date()
 strDate = CDate(oDate)
@@ -48,12 +51,18 @@ If sProcess_architecture = "x86" Then
     End if    
 End If
 
+Call forceUseCScript
+
+If Not executionEnabled Then
+	Call PrintExecutionPlan
+	WScript.Quit 0
+End If
+
 If UserPerms("Admin") Then
 	'Goood to go
 Else
 	Call forceAsAdmin
 End If
-Call forceUseCScript
 
 '	1. Sette opp loggrotering i scriptet.
 If Not oFSO.FolderExists(sLogLocation) Then
@@ -150,6 +159,8 @@ Set oReg=GetObject("winmgmts:{impersonationLevel=impersonate}!\\" & strComputer 
 oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Active Setup Temp Folders","StateFlags0101",00000002
 oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Active Setup Temp Folders","StateFlags0101",00000002
 oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Downloaded Program Files","StateFlags0101",00000002
+oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Delivery Optimization Files","StateFlags0101",00000002
+oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\DirectX Shader Cache","StateFlags0101",00000002
 oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Internet Cache Files","StateFlags0101",00000002
 oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Memory Dump Files","StateFlags0101",00000002
 oReg.SetDWORDValue HKEY_LOCAL_MACHINE,"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches\Offline Pages Files","StateFlags0101",00000002
@@ -579,33 +590,22 @@ Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\" & s
 Set oss = objWMIService.ExecQuery ("Select * from Win32_OperatingSystem")
 
 For Each os in oss
-	osVersion = Left(os.Version, 3)
+	osVersion = os.Version
 	oFile.WriteLine "Cleaning up " & sSystemRoot & "\winsxs"
 	
-	If Not StrComp(osVersion,"6.3") Then '2012R2
-		oShell.run "dism.exe /online /cleanup-image /spsuperseded", 1, true
-		oShell.run "dism.exe /online /cleanup-image /StartComponentCleanup ", 1, true
+	If IsDismComponentCleanupSupported(osVersion) Then
+		oShell.run "dism.exe /online /cleanup-image /StartComponentCleanup /Quiet /NoRestart", 1, true
 		If Err.Number <> 0 Then
 			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 20."
 			Err.Clear
 		End If
-	End If
-	If Not StrComp(osVersion,"6.2") Then '2012
-		oShell.run "dism.exe /online /cleanup-image /spsuperseded", 1, true
-		oShell.run "dism.exe /online /cleanup-image /StartComponentCleanup ", 1, true
-		If Err.Number <> 0 Then
-			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 20."
-			Err.Clear
-		End If
-	End If
-	If Not StrComp(osVersion,"6.1") Then '2008R2
+	ElseIf Left(osVersion, 3) = "6.1" Then '2008R2
 		oShell.run "dism.exe /online /cleanup-image /spsuperseded", 1, true
 		If Err.Number <> 0 Then
 			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 20."
 			Err.Clear
 		End If
-	End If
-	If Not StrComp(osVersion,"6.0") Then '2008
+	ElseIf Left(osVersion, 3) = "6.0" Then '2008
 		If oFSO.fileExists(sSystemRoot & "\system32\compcln.exe") Then
 			oShell.run sSystemRoot & "\system32\compcln.exe /quiet", 1, true
 			If Err.Number <> 0 Then
@@ -949,11 +949,12 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	31. Font cache cleanup:
-'		forfiles /P C:\Windows\
-If oFSO.FolderExists(sSystemDrive & "\ServiceProfiles\LocalService\AppData\Local") Then
-	oFile.WriteLine "Cleaning op FontCache Files in " & sSystemDrive & "\ServiceProfiles\LocalService\AppData\Local"
-	oShell.run sSystemDrive & "\ServiceProfiles\LocalService\AppData\Local /M FontCache* /D -30 /C ""cmd /c del @path""", 1, true
+'	31. Font cache cleanup for files older than 30 days.
+Dim fontCachePath
+fontCachePath = sSystemRoot & "\ServiceProfiles\LocalService\AppData\Local"
+If oFSO.FolderExists(fontCachePath) Then
+	oFile.WriteLine "Cleaning up FontCache files in " & fontCachePath
+	oShell.run "forfiles.exe /P """ & fontCachePath & """ /M FontCache* /D -30 /C ""cmd /c del /q @path""", 1, true
 	If Err.Number <> 0 Then
 		oFile.WriteLine "	Error cleaning up FontCache files: - (" & Err.Number & " - " & Err.Description & ") at point 31."
 	End If
@@ -994,14 +995,14 @@ Loop
 Sub forceUseCScript  
 	If Not WScript.FullName = WScript.Path & "\cscript.exe" Then      
 		oShell.Popup "Scriptet ble startet ved bruk av WScript. Starter igjen med cscript...",3,"WSCRIPT"
-		oShell.Run "cmd.exe /k " & WScript.Path & "\cscript.exe //NOLOGO " & Chr(34) & WScript.scriptFullName,1,False
+		oShell.Run "cmd.exe /k " & WScript.Path & "\cscript.exe //NOLOGO " & Chr(34) & WScript.scriptFullName & Chr(34) & relaunchArguments,1,False
 		WScript.Quit 0
 	End If
 End Sub
 Sub forceAsAdmin
 	If WScript.Arguments.Named.Exists("elevated") = False Then 
 		'oShell.Popup "Scriptet ble ikke startet som admin. Starter igjen med cscript og som admin...",3,"Manglende admin"
-		CreateObject("Shell.Application").ShellExecute WScript.Path & "\cscript.exe", """" & WScript.ScriptFullName & """ /elevated", "", "runas", 1 
+		CreateObject("Shell.Application").ShellExecute WScript.Path & "\cscript.exe", """" & WScript.ScriptFullName & """ /elevated /execute", "", "runas", 1
 		WScript.Quit 0
 	End If
 End Sub
@@ -1040,7 +1041,7 @@ Function UserPerms (PermissionQuery)
 		CheckFor = PermissionQuery                  
 	End Select           
 
-	CmdToRun = "%comspec% /c whoami /all | findstr /I /" & sSystemDrive & """" & CheckFor & """"  
+	CmdToRun = "%comspec% /c whoami /groups | findstr /I /C:""" & CheckFor & """"
 
 	Dim returnValue        
 	returnValue = oShell.Run(CmdToRun, 0, true)     
@@ -1048,6 +1049,17 @@ Function UserPerms (PermissionQuery)
 		UserPerms = True
 	End If
 End Function
+Sub PrintExecutionPlan
+	WScript.Echo "ryddeScript " & versionInfo & " - preview only"
+	WScript.Echo ""
+	WScript.Echo "No files, registry values, services, or system settings were changed."
+	WScript.Echo "Execution can clean temporary files, Windows caches, logs, dumps,"
+	WScript.Echo "component-store data, inactive profiles, restore points, and shadow copies."
+	WScript.Echo ""
+	WScript.Echo "WARNING: /execute enables the complete destructive legacy workflow."
+	WScript.Echo "Review the source, backups, and target machine before using:"
+	WScript.Echo "  cscript //nologo ryddeScript.vbs /execute"
+End Sub
 Function ReadReg(RegPath)
 	On Error Resume Next
     ReadReg = oShell.RegRead(RegPath)

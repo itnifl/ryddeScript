@@ -34,6 +34,18 @@ Function IsOlderThanDays(modifiedAt, referenceAt, minimumDays)
 	IsOlderThanDays = (DateDiff("d", CDate(modifiedAt), CDate(referenceAt)) >= CLng(minimumDays))
 End Function
 
+Function IsDismComponentCleanupSupported(versionValue)
+	Dim parts, majorVersion, minorVersion
+	IsDismComponentCleanupSupported = False
+	parts = Split(Trim(CStr(versionValue)), ".")
+	If UBound(parts) < 1 Then Exit Function
+	If Not IsNumeric(parts(0)) Or Not IsNumeric(parts(1)) Then Exit Function
+
+	majorVersion = CLng(parts(0))
+	minorVersion = CLng(parts(1))
+	IsDismComponentCleanupSupported = (majorVersion > 6 Or (majorVersion = 6 And minorVersion >= 2))
+End Function
+
 Function IsProtectedProfileName(profileName, currentProfileName)
 	Dim normalizedName, normalizedCurrent, protectedNames, item
 	normalizedName = LCase(Trim(CStr(profileName)))

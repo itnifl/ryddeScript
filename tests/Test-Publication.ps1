@@ -41,6 +41,12 @@ Assert-True ($headerVersion -eq $runtimeVersion) 'Header and runtime versions di
 Assert-True ($scriptText.Contains('IsProtectedProfileName(folder.Name, sCurrentProfileName)')) 'Profile cleanup does not use the protected-profile decision helper'
 Assert-True ($scriptText.Contains('CanDeletePath(folder.Path, oLocation.Path)')) 'Profile deletion does not enforce an allowed-root boundary'
 Assert-True ($scriptText.Contains('folder.Attributes And 1024')) 'Profile deletion does not reject reparse points'
+Assert-True ($scriptText.Contains('WScript.Arguments.Named.Exists("execute")')) 'Destructive execution is not protected by an explicit /execute switch'
+Assert-True ($scriptText.Contains('If Not executionEnabled Then')) 'The script does not default to preview-only mode'
+Assert-True ($scriptText.Contains('Delivery Optimization Files')) 'Modern Delivery Optimization cleanup is not configured'
+Assert-True ($scriptText.Contains('DirectX Shader Cache')) 'Modern DirectX shader-cache cleanup is not configured'
+Assert-True ($scriptText.Contains('IsDismComponentCleanupSupported(osVersion)')) 'Modern Windows component cleanup is not enabled'
+Assert-True ($readmeText -match '(?m)^# ryddeScript - cleanupScript$') 'README title does not include the English project name'
 Assert-True ($readmeText -match '(?i)tidy up.+clean up') 'README does not translate the project name'
 Assert-True ($readmeText -match '(?i)unsafe to execute') 'README does not clearly warn against execution'
 Assert-True ($readmeText -match '(?m)^## Table of contents$') 'README is missing its English table of contents'
@@ -53,6 +59,11 @@ Assert-True ($norwegianIndex -ge 0) 'README is missing the short Norwegian versi
 Assert-True (($englishIndex -ge 0) -and ($norwegianIndex -gt $englishIndex)) 'The English version must appear before the Norwegian version'
 Assert-True ($licenseText.StartsWith('MIT License')) 'LICENSE is not the MIT License'
 Assert-True ($licenseText -match 'THE SOFTWARE IS PROVIDED "AS IS"') 'License warranty disclaimer is missing'
+
+$previewOutput = & cscript.exe //nologo $scriptPath 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 0) 'Default preview returned a failure exit code'
+Assert-True ($previewOutput -match '(?i)preview only') 'Default invocation did not display preview mode'
+Assert-True ($previewOutput -match '(?i)no files, registry values, services, or system settings were changed') 'Default preview did not confirm that it made no system changes'
 
 $temporaryScript = Join-Path ([IO.Path]::GetTempPath()) ("ryddeScript-syntax-{0}.vbs" -f [guid]::NewGuid())
 try {
