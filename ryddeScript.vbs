@@ -13,7 +13,7 @@ Option Explicit
 On Error Resume Next
 
 Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
-Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore
+Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore, sCurrentProfileName
 Dim versionInfo
 versionInfo = "1.494-public"
 
@@ -29,9 +29,11 @@ progressCount = 0
 
 set oShell = wScript.createObject("wScript.shell")
 set oFSO = CreateObject("Scripting.FileSystemObject")
+LoadLibrary oFSO.BuildPath(oFSO.GetParentFolderName(WScript.ScriptFullName), "lib\RyddeDecisions.vbs")
 Set oProcEnv = oShell.Environment("Process")
 sSystemDrive = oShell.ExpandEnvironmentStrings("%SYSTEMDRIVE%")
 sSystemRoot = oShell.ExpandEnvironmentStrings("%SYSTEMROOT%")
+sCurrentProfileName = oFSO.GetFileName(oShell.ExpandEnvironmentStrings("%USERPROFILE%"))
 'sLogLocation = sSystemDrive & "\ryddeScriptLogs"
 sLogLocation = oFSO.GetParentFolderName(Wscript.ScriptFullName)
 sLogFileName = "ryddeLog-" & strDay & "." & strMonth & "." & strYear & ".log"
@@ -680,22 +682,23 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 	oFile.WriteLine "Checking user profiles: " & oLocation
 	For each folder In oLocation.Subfolders
 		If Not folder is Nothing And Not IsNull(folder) And Not IsEmpty(folder) Then
-			If StrComp(folder.Name,"All Users", 1) AND StrComp(folder.Name,"Alle Brukere", 1) AND StrComp(folder.Name,"Default", 1) AND StrComp(folder.Name,"Default User", 1) Then
-				Dim folderSize
-				folderSize = FormatNumber(((folder.Size / 1024) / 1024),2)
+			If Not IsProtectedProfileName(folder.Name, sCurrentProfileName) Then
+				Dim folderSize, folderSizeMB
+				folderSizeMB = CDbl(folder.Size) / 1024 / 1024
+				folderSize = FormatNumber(folderSizeMB, 2)
 				If Err.Number <> 0 Then
 					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ")  at point 21."
 					Err.Clear
 				End If
 				'On Error Goto 0
-				If DateDiff("d",folder.DateLastModified,oDate) >= 7 AND folderSize > 300 Then 
-					oFile.WriteLine "Deleting """ & folder.Path & """ with size " & folder.Size & " MB - it is more then 7 days since last login and larger then 300MB"
+				If IsOlderThanDays(folder.DateLastModified, oDate, 7) AND folderSizeMB > 300 AND CanDeletePath(folder.Path, oLocation.Path) AND ((folder.Attributes And 1024) = 0) Then
+					oFile.WriteLine "Deleting """ & folder.Path & """ with size " & folderSize & " MB - it is more then 7 days since last modification and larger then 300 MB"
 					oFSO.DeleteFolder folder.Path, True
 				Else
 					oFile.WriteLine "Checked """ & folder.Path & """ but its space usage was either less then the set limit, or it has been used the last seven days"
 					oFile.WriteLine "		- no action taken against this folder..."
 				End If
-				If DateDiff("d",folder.DateLastModified,oDate) < 7 AND folderSize > 400 Then 
+				If Not IsOlderThanDays(folder.DateLastModified, oDate, 7) AND folderSizeMB > 400 Then
 					oFile.WriteLine "Reporting in this log folder """ & folder.Path & """ with size " & folderSize & " MB - it is larger then 400MB"
 				End If
 			Else
@@ -879,7 +882,7 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 	oFile.WriteLine "Checking user profiles temp folder: " & oLocation
 	For each folder In oLocation.Subfolders
 		If Not folder is Nothing And Not IsNull(folder) And Not IsEmpty(folder) Then
-			If StrComp(folder.Name,"All Users", 1) AND StrComp(folder.Name,"Alle Brukere", 1) AND StrComp(folder.Name,"Default", 1) AND StrComp(folder.Name,"Default User", 1) Then
+			If Not IsProtectedProfileName(folder.Name, sCurrentProfileName) Then
 				If Err.Number <> 0 Then
 					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ")  at point 4."
 					Err.Clear
@@ -1070,3 +1073,11 @@ Function deletePatchCache(oFile)
 	oShell.run "rmdir /Q /S " & sSystemRoot & "\installer\$PatchCache$", 1, true
 	oFSO.DeleteFolder sSystemRoot & "\installer\$PatchCache$", True
 End Function
+
+Sub LoadLibrary(libraryPath)
+	Dim libraryFile, librarySource
+	Set libraryFile = oFSO.OpenTextFile(libraryPath, 1, False)
+	librarySource = libraryFile.ReadAll
+	libraryFile.Close
+	ExecuteGlobal librarySource
+End Sub

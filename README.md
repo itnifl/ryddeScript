@@ -34,7 +34,20 @@ The repository currently preserves the legacy implementation for review and mode
 ## Repository contents
 
 - `ryddeScript.vbs` — sanitized legacy cleanup script.
+- `lib/RyddeDecisions.vbs` — side-effect-free safety and retention decisions used by the legacy script.
+- `tests/` — decision-unit, publication, and parser tests.
 - `LICENSE` — MIT License; use and modification are permitted without warranty.
+
+## Tests
+
+The test suite is intentionally non-destructive. It exercises pure decision helpers and validates the public source without running the cleanup workflow:
+
+```powershell
+cscript.exe //nologo tests/RyddeDecisions.Tests.vbs
+./tests/Test-Publication.ps1
+```
+
+GitHub Actions runs both commands for every pull request and every push to `main`. The `Tests` check is required by branch protection, so a failing test prevents the pull request from being merged.
 
 ## Historical invocation
 
