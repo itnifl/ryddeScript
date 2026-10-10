@@ -1,4 +1,4 @@
-# ryddeScript
+# ryddeScript - cleanupScript
 
 ## Table of contents
 
@@ -18,6 +18,7 @@ The script is organized as a sequential cleanup workflow. Its main concepts are:
 - **Discovery:** inspect the Windows version, architecture, registry, filesystem, and installed server roles before deciding whether a cleanup step applies.
 - **Retention rules:** identify selected temporary files, dumps, logs, and folders by age, size, name, or location.
 - **Windows maintenance tools:** invoke utilities such as Disk Cleanup, DISM, `compact`, `powercfg`, and `vssadmin`.
+- **Modern Windows caches:** include Delivery Optimization files and the DirectX shader cache through Windows Disk Cleanup.
 - **Server-role cleanup:** handle generic IIS, Exchange, and WSUS log or maintenance locations when present.
 - **Logging and reporting:** record attempted actions and compare free disk space before and after execution.
 - **Elevation:** relaunch through `cscript.exe` with administrative rights when required.
@@ -26,7 +27,7 @@ Environment-specific product paths, private deployment conventions, personal nam
 
 ### Important safety warning
 
-This is historical code, not a production-ready cleanup utility. It performs broad and potentially destructive actions, including deleting files, user-profile data, shadow copies, restore points, and installer caches. Some logic targets Windows and server products that are now old.
+This is historical code, not a production-ready cleanup utility. It performs broad and potentially destructive actions, including deleting files, user-profile data, shadow copies, restore points, and installer caches. Some logic targets Windows and server products that are now old. Running it without arguments is a non-destructive preview; destructive execution requires the explicit `/execute` switch.
 
 Do not run it on a real machine without first:
 
@@ -54,17 +55,23 @@ cscript.exe //nologo tests/RyddeDecisions.Tests.vbs
 ./tests/Test-Publication.ps1
 ```
 
-GitHub Actions runs both commands for every pull request and every push to `main`. The `Tests` check is required by branch protection, so a failing test prevents the pull request from being merged.
+GitHub Actions is configured to run both commands for every pull request and every push to `main`. The check is temporarily optional while repository billing prevents hosted jobs from starting; make it required again once Actions is available.
 
 ### Historical invocation
 
-After a complete code and safety review, the legacy script would be invoked from an elevated command prompt with:
+The safe default displays the execution plan without changing the machine:
 
 ```bat
 cscript //nologo ryddeScript.vbs
 ```
 
-This command is documentation of the original interface, not a recommendation to execute the current script.
+After a complete code and safety review, the destructive legacy workflow can be explicitly enabled from an elevated command prompt with:
+
+```bat
+cscript //nologo ryddeScript.vbs /execute
+```
+
+The `/execute` command documents the interface; it is not a recommendation to run the script on a real machine.
 
 ### Recommended modernization
 
@@ -78,7 +85,7 @@ The project is available under the [MIT License](LICENSE). Anyone may use, copy,
 
 **«Rydde» betyr å ordne eller gjøre rent. `ryddeScript` betyr derfor «ryddeskript».**
 
-Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det finner utvalgte midlertidige filer, logger og andre diskplasskrevende data, og bruker regler for alder og størrelse før opprydding.
+Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det finner utvalgte midlertidige filer, logger og andre diskplasskrevende data. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/execute` må oppgis for å kjøre oppryddingen.
 
 Skriptet kan slette filer, profildata, skyggekopier, gjenopprettingspunkter og installasjonsbuffere. Det er historisk kode og er **ikke trygt å kjøre som publisert**. Les hele kildekoden, innfør en reell tørrkjøringsmodus, ta sikkerhetskopi og test i en midlertidig virtuell maskin først.
 
