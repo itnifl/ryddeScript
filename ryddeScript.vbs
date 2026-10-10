@@ -1,65 +1,21 @@
-''Version 1.494
+''Version 1.494-public
 
-'Utfør følgende:
-'	
-'	[OK] 1. Sette opp loggrotering i scriptet. Loggene lagres på samme sted som scriptet kjøres.
-'	[OK] 2. Logg hvor mye plass er ledig på systemdisken både før og etter	
-'		 3. Ha med WhatIf kjørsel
-'	[OK] 4. Sjekker at cleanmgr.exe og tilhørende følgefil ligger der den skal eller plasserer den rett ut fra stier funnet i http://technet.microsoft.com/en-us/library/ff630161(v=ws.10).aspx
-' 	[OK] 5. Kopier over og kjør registryfil som inneholder registrysetting som hva som skal ryddes med cleanmgr.exe.
-'	[OK] 6. Kjør cleanmgr.exe /d %SystemDrive% /sagerun:101 - hvor 101 er settinger definert i registryfil.
-'		Disse er lagret under HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VolumeCaches
-'		-> Rydder: Temporary Setup Files, Downloaded Program Files, Temporary Internet files, Offline Webpages, Debug Dump Files, 
-'	   	Old Chkdsk files, Recycle Bin(current user), Service Pack Backup Files, Setup Logs, System Error Memory Dump Files, System Error Minidump Files,
-'	   	Temporary Files, Temporary Windows Installation Files, Thumbnails, Files discarded by Windows Upgrade, 
-'	   	Peruser Archived/queued Windows Error Reporting Files, System archived/queued Windows Error Reporting Files, Windows upgrade log files
-'	[OK] 7. Slette alle/siste shadow copies : vssadmin delete shadows /for=%SystemDrive% /all /quiet
-'	[OK] 8. Kjøre CCleaner via kommandolinjen. Dette skjer bare om denne er installert. Installere med scriptet?
-'	[OK] 9. Minke alle restore points til maks 0GB : vssadmin Resize ShadowStorage /For=%SystemDrive% /On=%SystemDrive% /MaxSize=0GB
-'	[OK] 10. Sjekke om det fortsatt ligger Memory dumps og slett dem : %SystemRoot%\MEMORY.DMP & %SystemRoot%\Minidump\*.* + TSM
-'			 + Slå av hibernation hvis dette er på.
-'	[OK] 11. IIS logfiler - %SystemDrive%\inetpub\logs\LogFiles - komprimer med compact /c /s mappe /i /q /f - samme gjelder %SystemRoot%\SYSTEM32\LogFiles\
-'	[OK] 12. Exchange log filer - komprimer med compact /c /s mappe /i /q /f
-'					- Lokasjon hentes fra HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\ExchangeServer\v14\Setup\MsiInstallPath ved 2010, logger under \Logging
-'					- Lokasjon hentes fra HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\v8.0\Setup\MsiInstallPath ved 2007, logger under \Logging
-'					- Lokasjon hentes fra HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Exchange\Setup\ExchangeServerAdmin ved 2003, logger under \MDBDATA og *.log
-'	[OK] 13. %SystemRoot%\installer\$PatchCache$ - slettes 
-'	[OK] 14. %SystemRoot%\$blabla$ - hvis eldre enn 30 dager - slettes
-'	[OK] 15. %SystemDrive%\$Recycle.Bin - slettes - rd /s c:\$Recycle.Bin 
-'	[OK] 16. Rydde wsus update filer - status: koden er delvis i orden. Krever at fil WSUSCleanupCL.exe installeres under %SystemRoot%\System32 mappa. Installere med scriptet?
-'		a) sjekk om wsus er installert og kjør wsus cleanup - ikke dette -> net stop wuauserv + slett %SystemRoot%\SoftwareDistribution\Download + net start wuauserv 				
-'	[OK] 17. %SystemDrive%\PerfLogs - komprimer med compact /c /s mappe /i /q /f
-'	[OK] 18. %SystemDrive%\MSOCache - komprimer med compact /c /s mappe /i /q /f
-'	[OK] 19. %SystemDrive%\Service - slette zip og isofiler eldre enn 14 som ligger under rota av  %SystemDrive%\Service - det samme gjelder mapper eldre enn 30 dager.
-'						La til sletting av exe filer eldre enn 14 dager også.
-'	[OK] 20. %SystemRoot%\installer - ryddes med MsiZap.exe? - ikke lenger supportert av Microsoft :/ - Avslått!
-'		Her utfører vi rydding av winsxs mappe i stedet med Microsoft verktøy.
-'	[OK] 21. Brukerprofiler:
-'		1. Slett brukerprofiler som har modified date senere enn 7 dager siden(ikke vært brukt på en uke) og er større enn 300 MB
-'		2. Rapporter brukerprofiler som er over 400 MB i loggfil
-'	[OK] 22. Slette innhold i temp katalogen for alt som er eldre enn 7 dager
-'	[OK] 23. Fjerne filer av type lpt$vpn.567, ssaptn.347, tmblack.163, tmwhite.821, irc$oth.xxx men la de fire siste stå igjen
-'	[OK] 24. Slette alt som er mulig å slette under c:\windows\temp\
-'	[OK] 25. Rydd rota for småfiler - bare systemfiler skal være her(.rnd, bootmgr, BOOTSECT.BAK, END. HIBERFIL.SYS, PAGEFILE.SYS, 
-'			autoexec.bat, config.sys, io.sys, Bootlog.prv, Bootlog.txt, Command.com, Command.dos, Config.dos, Cvt.log, Detlog.old, Detlog.txt,
-'			Io.dos, Logo.sys, Msdos.dos, Msdos.sys, Suhdlog.dat, System.1st, Videorom.bin, W95undo.dat, W95undo.ini)
-
-'	[OK] 26. Se etter Sectra RIS logg filer å komprimere og komprimer disse. Koden henter stier fra fra registry og disse er versjonsspesifikke.
-' 	[OK] 27. Hvis tsm_images finnes på rota av systemdisk, fjerner vi denne.
-'	[OK] 28. Hvis ExchangeSetupLogs finnes på rota av systemdisk, kan vi komprimere denne.
-'	[OK] 29. Rydd Systemdisk\Omnigate\LOG og Systemdisk\Omnigate\Alerts.
-'	[OK] 30. Brukerprofilrydding
-'   [OK] 31. Rydde i Fontcache filer
-'	[OK] 32. Skriv inn i registry hvor scriptet ligger og hvilken versjon det er
-
+' ryddeScript means "cleanup script" in Norwegian.
+' This public legacy edition contains only generic Windows and server-role logic.
+' Environment-specific product paths, private deployment conventions, personal
+' names, and organization-specific cleanup rules have been removed.
+'
+' WARNING: This historical script performs destructive cleanup and is not safe
+' to run on a production machine without a complete review and a real dry-run mode.
+'
 ''Kode begynner her:
 Option Explicit
 On Error Resume Next
 
 Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
-Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore
+Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore, sCurrentProfileName
 Dim versionInfo
-versionInfo = "1.493"
+versionInfo = "1.494-public"
 
 oDate = date()
 strDate = CDate(oDate)
@@ -73,9 +29,11 @@ progressCount = 0
 
 set oShell = wScript.createObject("wScript.shell")
 set oFSO = CreateObject("Scripting.FileSystemObject")
+LoadLibrary oFSO.BuildPath(oFSO.GetParentFolderName(WScript.ScriptFullName), "lib\RyddeDecisions.vbs")
 Set oProcEnv = oShell.Environment("Process")
 sSystemDrive = oShell.ExpandEnvironmentStrings("%SYSTEMDRIVE%")
 sSystemRoot = oShell.ExpandEnvironmentStrings("%SYSTEMROOT%")
+sCurrentProfileName = oFSO.GetFileName(oShell.ExpandEnvironmentStrings("%USERPROFILE%"))
 'sLogLocation = sSystemDrive & "\ryddeScriptLogs"
 sLogLocation = oFSO.GetParentFolderName(Wscript.ScriptFullName)
 sLogFileName = "ryddeLog-" & strDay & "." & strMonth & "." & strYear & ".log"
@@ -251,7 +209,7 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	8. Silent install av CCleaner og kjøre denne via kommandolinjen? - Silent install via Nimbus
+'	8. Run CCleaner through its command-line interface when it is already installed.
 If oFSO.fileExists(sSystemDrive & "\Program Files\CCleaner\CCleaner.exe")  Then
 	oFile.WriteLine "Starting CCleaner.exe and cleaning out what we can.."
 	oShell.run """" & sSystemDrive & "\Program Files\CCleaner\CCleaner.exe"" /AUTO", 1, true
@@ -283,7 +241,7 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	10. Sjekke om det fortsatt ligger Memory dumps og slett dem: %SystemRoot%\MEMORY.DMP & %SystemRoot%\Minidump\*.*, samt hos TSM
+'	10. Remove Windows memory dump files from standard Windows locations.
 If oFSO.fileExists(sSystemRoot & "\MEMORY.DMP")  Then
 	oFile.WriteLine "Deleting MEMORY.DMP.."
 	oFSO.DeleteFile(sSystemRoot & "\MEMORY.DMP")
@@ -331,99 +289,9 @@ Else
 	oFile.WriteLine "      Skipping..."
 End If
 Err.Clear
-If regValueExists("HKLM\SOFTWARE\IBM\ADSM\CurrentVersion\TSMClientPath") Then
-	Dim oDeepFolderRoot
-	Set sRegContent = Nothing
-	sRegContent = ReadReg("HKLM\SOFTWARE\IBM\ADSM\CurrentVersion\TSMClientPath")
-	If oFSO.FolderExists(sRegContent) Then
-		Set oFolderRoot = oFSO.GetFolder(sRegContent)
-		For each folder In oFolderRoot.SubFolders
-			If StrComp("config",folder.Name,1) <> 0 AND StrComp("doc",folder.Name,1) <> 0 Then
-				Set oDeepFolderRoot = oFSO.GetFolder(folder.Path)
-				If Err.Number <> 0 Then
-					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 10 - mapping oDeepFolderRoot"
-					Err.Clear
-				End If
-				For each file In oDeepFolderRoot.Files
-					If StrComp(file.Name,"sqlfull.log",1) = 0 Then
-						oFile.WriteLine "Deleting " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered deleting sqlfull.log (" & Err.Number & " - " & Err.Description & ") at point 10 - path " & file.Path
-							Err.Clear
-						End If
-					End If
-					If StrComp(file.Name,"sqlfull.log.old",1) = 0 Then
-						oFile.WriteLine "Deleting " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered deleting sqlfull.log.old (" & Err.Number & " - " & Err.Description & ") at point 10 - path " & file.Path
-							Err.Clear
-						End If
-					End If
-					If StrComp(file.Name,"sqlfull.log.old2",1) = 0 Then
-						oFile.WriteLine "Deleting " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered deleting sqlfull.log.old2 (" & Err.Number & " - " & Err.Description & ") at point 10 - path " & file.Path
-							Err.Clear
-						End If
-					End If
-					If StrComp(file.Name,"excfull.log",1) = 0 Then
-						oFile.WriteLine "Deleting " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered deleting excfull.log (" & Err.Number & " - " & Err.Description & ") at point 10 - path " & file.Path
-							Err.Clear
-						End If
-					End If
-					If StrComp(file.Name,"excfull.log.old",1) = 0 Then
-						oFile.WriteLine "Deleting " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered deleting excfull.log.old (" & Err.Number & " - " & Err.Description & ") at point 10 - path " & file.Path
-							Err.Clear
-						End If
-					End If
-					If StrComp(file.Name,"excfull.log.old2",1) = 0 Then
-						oFile.WriteLine "Deleting " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered deleting excfull.log.old2 (" & Err.Number & " - " & Err.Description & ") at point 10 - path " & file.Path
-							Err.Clear
-						End If
-					End If
-					If StrComp(oFSO.GetExtensionName(file.Name),"dmp",1) = 0 Then
-						oFile.WriteLine "Deleting TSM Dump " & file.Path
-						oFSO.DeleteFile file.Path, True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 10 - when deleting " & file.Path
-							Err.Clear
-						End If
-					End If
-					If (DateDiff("d",file.DateCreated,oDate) >= 31) AND FormatNumber(((file.Size / 1024) / 1024),0) > 100 Then
-						oFile.WriteLine "Deleting " & file.Path & " with size " & FormatNumber(((file.Size / 1024) / 1024),2) & " MB - it is more then 31 days since it was last modified and it is more then 100 MB large"
-						subFile.Delete True
-						If Err.Number <> 0 Then
-							oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 11 when deleting subfiles in subfolders in log folder.."
-							Err.Clear
-						End If
-					End If
-				Next
-			End If
-		Next
-	Else 
-		oFile.WriteLine "Found registry keys for TSM, but the detected installation folder """ & sRegContent & """ was not found."
-		oFile.WriteLine "      Skipping..."
-	End If 
-Else
-	oFile.WriteLine "Did not detect TSM on this server"
-	oFile.WriteLine "      Skipping..."
-End If
-'	Show Progress as dots:
+' Environment-specific cleanup step removed from the public version.
 DisplayProgress(1)
 Err.Clear
-
 
 '	11. IIS logfiler - %SystemDrive%\inetpub\logs\LogFiles - komprimer med compact /s mappe /i /q - samme gjelder %SystemRoot%\SYSTEM32\LogFiles\
 If oFSO.FolderExists(sSystemDrive & "\inetpub\logs\LogFiles\")  Then
@@ -700,57 +568,7 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	19. %SystemDrive%\Service
-' 		Foreslått å slette alt eldre enn 1 mnd + komprimere og deretter ekskludere .vbs, .ps1, .bat. - Avslått!
-'		Foreslått å slette zip og isofiler eldre enn 14 som ligger under rota av  %SystemDrive%\Service - OK! Utføres.
-'		Legger til sletting av exe filer eldre enn 14 dager også.
-If oFSO.FolderExists(sSystemDrive & "\Service")  Then
-	oFile.WriteLine "Deleting iso, exe and zip files in " & sSystemDrive & "\Service"
-	Set objRE = New RegExp
-	With objRE
-		'Tester om filnavn ender på zip eller iso:
-		.Pattern    = "^.*\.(zip|iso|exe)$"
-		.IgnoreCase = True
-		.Global     = True
-	End With
-	Set oLocation = oFSO.GetFolder(sSystemDrive & "\Service")
-	For each file In oLocation.Files
-		If Err.Number <> 0 Then
-			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 19."
-			Err.Clear
-		End If
-		If objRE.Test(file.Name) Then
-			If DateDiff("d",file.DateCreated,oDate) >= 14 Then
-				oFile.WriteLine "Deleting " & file.Path & " with size " & FormatNumber(((file.Size / 1024) / 1024),2) & " MB - it is more then 14 days since it was last modified"
-				file.Delete True
-				If Err.Number <> 0 Then
-					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 19."
-					Err.Clear
-				End If
-			End If
-		End If
-	Next
-	For each folder In oLocation.SubFolders
-		If Err.Number <> 0 Then
-			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 19 when looping through folders."
-			Err.Clear
-		End If
-		If objRE.Test(folder.Name) Then
-			If DateDiff("d",folder.DateCreated,oDate) >= 30 Then
-				oFile.WriteLine "Deleting " & folder.Path
-				folder.Delete True
-				If Err.Number <> 0 Then
-					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 19 when looping through folders."
-					Err.Clear
-				End If
-			End If
-		End If
-	Next
-Else
-	oFile.WriteLine "Did not find " & sSystemDrive & "\Service"
-	oFile.WriteLine "      Skipping..."
-End If
-'	Show Progress as dots:
+' Environment-specific cleanup step removed from the public version.
 DisplayProgress(1)
 Err.Clear
 
@@ -864,22 +682,23 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 	oFile.WriteLine "Checking user profiles: " & oLocation
 	For each folder In oLocation.Subfolders
 		If Not folder is Nothing And Not IsNull(folder) And Not IsEmpty(folder) Then
-			If StrComp(folder.Name,"All Users", 1) AND StrComp(folder.Name,"Alle Brukere", 1) AND StrComp(folder.Name,"Default", 1) AND StrComp(folder.Name,"Default User", 1) Then
-				Dim folderSize
-				folderSize = FormatNumber(((folder.Size / 1024) / 1024),2)
+			If Not IsProtectedProfileName(folder.Name, sCurrentProfileName) Then
+				Dim folderSize, folderSizeMB
+				folderSizeMB = CDbl(folder.Size) / 1024 / 1024
+				folderSize = FormatNumber(folderSizeMB, 2)
 				If Err.Number <> 0 Then
 					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ")  at point 21."
 					Err.Clear
 				End If
 				'On Error Goto 0
-				If DateDiff("d",folder.DateLastModified,oDate) >= 7 AND folderSize > 300 Then 
-					oFile.WriteLine "Deleting """ & folder.Path & """ with size " & folder.Size & " MB - it is more then 7 days since last login and larger then 300MB"
+				If IsOlderThanDays(folder.DateLastModified, oDate, 7) AND folderSizeMB > 300 AND CanDeletePath(folder.Path, oLocation.Path) AND ((folder.Attributes And 1024) = 0) Then
+					oFile.WriteLine "Deleting """ & folder.Path & """ with size " & folderSize & " MB - it is more then 7 days since last modification and larger then 300 MB"
 					oFSO.DeleteFolder folder.Path, True
 				Else
 					oFile.WriteLine "Checked """ & folder.Path & """ but its space usage was either less then the set limit, or it has been used the last seven days"
 					oFile.WriteLine "		- no action taken against this folder..."
 				End If
-				If DateDiff("d",folder.DateLastModified,oDate) < 7 AND folderSize > 400 Then 
+				If Not IsOlderThanDays(folder.DateLastModified, oDate, 7) AND folderSizeMB > 400 Then
 					oFile.WriteLine "Reporting in this log folder """ & folder.Path & """ with size " & folderSize & " MB - it is larger then 400MB"
 				End If
 			Else
@@ -895,372 +714,7 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	23. Fjerne filer av type lpt$vpn.567, ssaptn.347, tmblack.163, tmwhite.821, icrc$oth.xxx, irc$oth.xxx men la de fire siste stå igjen - ligger under sSystemDrive\Program Files\Trend Micro\OfficeScan Client
-'	HKLM\SOFTWARE\TrendMicro\PC-cillinNTCorp\CurrentVersion\Application Path
-'	HKLM\SOFTWARE\TrendMicro\OfcWatchDog\DogVar-ProcessPath
-'	HKLM\SOFTWARE\TrendMicro\NSC\TmProxy\InstallPath
-Set sRegContent = Nothing
-Set oFolderRoot = Nothing
-If regValueExists("HKLM\SOFTWARE\TrendMicro\OfcWatchDog\DogVar-ProcessPath") Then
-	sRegContent = ReadReg("HKLM\SOFTWARE\TrendMicro\OfcWatchDog\DogVar-ProcessPath")
-ElseIf regValueExists("HKLM\SOFTWARE\TrendMicro\PC-cillinNTCorp\CurrentVersion\Application Path") Then
-	sRegContent = ReadReg("HKLM\SOFTWARE\TrendMicro\PC-cillinNTCorp\CurrentVersion\Application Path")
-ElseIf regValueExists("HKEY_LOCAL_MACHINE\SOFTWARE\TrendMicro\NSC\TmProxy\InstallPath") Then
-	sRegContent = ReadReg("HKEY_LOCAL_MACHINE\SOFTWARE\TrendMicro\NSC\TmProxy\InstallPath")
-Else
-	oFile.WriteLine "Did not detect Trend Micro on this server"
-	oFile.WriteLine "      Skipping..."
-End If
-Err.Clear
-
-If Len(sRegContent) > 0 Then
-	If oFSO.FolderExists(sRegContent) Then
-		oFile.WriteLine "Checking for files of type lpt$vpn.xxx, ssaptn.xxx, tmblack.xxx, tmwhite.xxx, icrc$oth.xxx, irc$oth.xxx in """ & sRegContent & """"
-		Set oFolderRoot = oFSO.GetFolder(sRegContent)
-		If Err.Number <> 0 Then
-			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - before file loop with sRegContent: " & sRegContent
-			Err.Clear
-		End If
-		'http://stackoverflow.com/questions/268648/how-do-i-sort-arrays-using-vbscript
-		Dim lptvpn(1000), ssaptn(1000), tmblack(1000), tmwhite(1000), ircoth(1000), icrcoth(1000)
-		Dim lptvpnCounter, ssaptnCounter, tmblackCounter, tmwhiteCounter, ircothCounter, icrcothCounter
-		Dim lptvpnHighest, ssaptnHighest, tmblackHighest, tmwhiteHighest, ircothHighest, icrcothHighest
-		Dim tempNumber
-		
-		lptvpnCounter = 0
-		ssaptnCounter = 0
-		tmblackCounter = 0
-		tmwhiteCounter = 0
-		ircothCounter = 0
-		icrcothCounter = 0
-		
-		lptvpnHighest = 0
-		ssaptnHighest = 0
-		tmblackHighest = 0
-		tmwhiteHighest = 0
-		ircothHighest = 0
-		icrcothHighest = 0
-		
-		For each file In oFolderRoot.files
-			If oFSO.FileExists(file.Path) Then
-				If Err.Number <> 0 Then
-					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - in file loop with sRegContent: " & sRegContent
-					Err.Clear
-				End If
-				'Her går vi gjennom alle filene funnet i den aktuelle mappa og lagrer stien til disse i en array fore hver sekvens med filer
-				Set tempNumber = Nothing
-				If (StrComp(Mid(file.name, 1, 7), "lpt$vpn") = 0) AND lptvpnCounter <= 1000 Then
-					lptvpn(lptvpnCounter) = file.Path
-					tempNumber = Right(file.name, 3)
-					If IsNumeric(tempNumber) Then
-						tempNumber = CInt(tempNumber)
-						If lptvpnHighest < tempNumber Then
-							lptvpnHighest = tempNumber
-						End If
-					End If
-					lptvpnCounter = lptvpnCounter + 1
-				End If
-				Set tempNumber = Nothing
-				If (StrComp(Mid(file.name, 1, 6), "ssaptn") = 0) AND ssaptnCounter <= 1000 Then
-					ssaptn(ssaptnCounter) = file.Path
-					tempNumber = Right(file.name, 3)
-					If IsNumeric(tempNumber) Then
-						tempNumber = CInt(tempNumber)
-						If ssaptnHighest < tempNumber Then
-							ssaptnHighest = tempNumber
-						End If
-					End If
-					ssaptnCounter = ssaptnCounter + 1
-				End If
-				Set tempNumber = Nothing
-				If (StrComp(Mid(file.name, 1, 7), "tmblack") = 0) AND tmblackCounter <= 1000 Then
-					tmblack(tmblackCounter) = file.Path
-					tempNumber = Right(file.name, 3)
-					If IsNumeric(tempNumber) Then
-						tempNumber = CInt(tempNumber)
-						If tmblackHighest < tempNumber Then
-							tmblackHighest = tempNumber
-						End If
-					End If
-					tmblackCounter = tmblackCounter + 1
-				End If
-				Set tempNumber = Nothing
-				If (StrComp(Mid(file.name, 1, 7), "tmwhite") = 0) AND tmwhiteCounter <= 1000 Then
-					tmwhite(tmwhiteCounter) = file.Path
-					tempNumber = Right(file.name, 3)
-					If IsNumeric(tempNumber) Then
-						tempNumber = CInt(tempNumber)
-						If tmwhiteHighest < tempNumber Then
-							tmwhiteHighest = tempNumber
-						End If
-					End If
-					tmwhiteCounter = tmwhiteCounter + 1
-				End If
-				If (StrComp(Mid(file.name, 1, 7), "irc$oth") = 0) AND ircothCounter <= 1000 Then
-					ircoth(ircothCounter) = file.Path
-					tempNumber = Right(file.name, 3)
-					If IsNumeric(tempNumber) Then
-						tempNumber = CInt(tempNumber)
-						If ircothHighest < tempNumber Then
-							ircothHighest = tempNumber
-						End If
-					End If
-					ircothCounter = ircothCounter + 1
-				End If
-				If (StrComp(Mid(file.name, 1, 8), "icrc$oth") = 0) AND icrcothCounter <= 1000 Then
-					icrcoth(icrcothCounter) = file.Path
-					tempNumber = Right(file.name, 3)
-					If IsNumeric(tempNumber) Then
-						tempNumber = CInt(tempNumber)
-						If icrcothHighest < tempNumber Then
-							icrcothHighest = tempNumber
-						End If
-					End If
-					icrcothCounter = icrcothCounter + 1
-				End If
-				If (StrComp(oFSO.GetExtensionName(file.Name),"dmp",1) = 0) Then
-					oFile.WriteLine "Deleting Dump File" & file.Path
-					oFSO.DeleteFile file.Path, True
-					If Err.Number <> 0 Then
-						oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - when deleting " & file.Path
-						Err.Clear
-					End If
-				End If
-			End If
-		Next
-		'Herfra sletter vi de filene funnet som stemmer med de kriteriene vi har gitt:
-		If lptvpnHighest > 0 Then
-			Set count = Nothing
-			Set tempNumber = Nothing
-			For count = 0 to lptvpnCounter
-				tempNumber = Right(lptvpn(count), 3)
-				If IsNumeric(tempNumber) Then
-					tempNumber = CInt(tempNumber)			
-					If tempNumber < (lptvpnHighest - 4) Then
-						Set file = Nothing
-						file = oFSO.GetFile(lptvpn(count))
-						If DateDiff("d",file.DateCreated,oDate) >= 14 Then
-							oFile.WriteLine "    Deleting Trend signature File " & lptvpn(count)
-							oFSO.DeleteFile lptvpn(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - lpt$vpn deletion."
-								Err.Clear
-							End If
-						End If
-					Else 
-						Set file = Nothing
-						file = oFSO.GetFile(lptvpn(count))
-						If DateDiff("d",file.DateCreated,oDate) > 32 Then
-							oFile.WriteLine "    Deleting Trend signature File " & lptvpn(count)
-							oFSO.DeleteFile lptvpn(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - lpt$vpn deletion of highest numbered files."
-								Err.Clear
-							End If
-						Else
-							oFile.WriteLine "     Found " & lptvpn(count) & ", but it was within the 5 newest in its sequence and younger then 32 days old, so it was left untouched."
-						End If
-					End If
-				End If
-			Next
-		Else
-			oFile.WriteLine "      Did not find any lpt$vpn files..."
-		End If
-		If ssaptnHighest > 0 Then
-			Set count = Nothing
-			Set tempNumber = Nothing
-			For count = 0 to ssaptnCounter
-				tempNumber = Right(ssaptn(count), 3)
-				If IsNumeric(tempNumber) Then
-					tempNumber = CInt(tempNumber)
-					If tempNumber < (ssaptnHighest - 4) Then
-						Set file = Nothing
-						file = oFSO.GetFile(ssaptn(count))
-						If DateDiff("d",file.DateCreated,oDate) >= 14 Then
-							oFile.WriteLine "    Deleting Trend signature File " & ssaptn(count)
-							oFSO.DeleteFile ssaptn(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - ssaptn deletion."
-								Err.Clear
-							End If
-						End If
-					Else 
-						Set file = Nothing
-						file = oFSO.GetFile(ssaptn(count))
-						If DateDiff("d",file.DateCreated,oDate) > 32 Then
-							oFile.WriteLine "    Deleting Trend signature File " & ssaptn(count)
-							oFSO.DeleteFile ssaptn(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - ssaptn deletion of highest numbered files."
-								Err.Clear
-							End If
-						Else
-							oFile.WriteLine "     Found " & ssaptn(count) & ", but it was within the 5 newest in its sequence and younger then 32 days old, so it was left untouched."
-						End If
-					End If
-				End If
-			Next
-		Else
-			oFile.WriteLine "      Did not find any ssaptn files..."
-		End If
-		If tmblackHighest > 0 Then
-			Set count = Nothing
-			Set tempNumber = Nothing
-			For count = 0 to tmblackCounter
-				tempNumber = Right(tmblack(count), 3)
-				If IsNumeric(tempNumber) Then
-					tempNumber = CInt(tempNumber)
-					If tempNumber < (tmblackHighest - 4) Then
-						Set file = Nothing
-						file = oFSO.GetFile(tmblack(count))
-						If DateDiff("d",file.DateCreated,oDate) >= 14 Then
-							oFile.WriteLine "    Deleting Trend signature File " & tmblack(count)
-							oFSO.DeleteFile tmblack(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - tmblack deletion."
-								Err.Clear
-							End If
-						End If
-					Else 
-						Set file = Nothing
-						file = oFSO.GetFile(tmblack(count))
-						If DateDiff("d",file.DateCreated,oDate) > 32 Then
-							oFile.WriteLine "    Deleting Trend signature File " & tmblack(count)
-							oFSO.DeleteFile tmblack(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - tmblack deletion of highest numbered files."
-								Err.Clear
-							End If
-						Else
-							oFile.WriteLine "     Found " & tmblack(count) & ", but it was within the 5 newest in its sequence and younger then 32 days old, so it was left untouched."
-						End If
-					End If
-				End If
-			Next
-		Else
-			oFile.WriteLine "      Did not find any tmblack files..."
-		End If
-		If tmwhiteHighest > 0 Then
-			Set count = Nothing
-			Set tempNumber = Nothing
-			For count = 0 to tmwhiteCounter
-				tempNumber = Right(tmwhite(count), 3)
-				If IsNumeric(tempNumber) Then
-					tempNumber = CInt(tempNumber)
-					If tempNumber < (tmwhiteHighest - 4) Then
-						Set file = Nothing
-						file = oFSO.GetFile(tmwhite(count))
-						If DateDiff("d",file.DateCreated,oDate) > 14 Then
-							oFile.WriteLine "    Deleting Trend signature File " & tmwhite(count)
-							oFSO.DeleteFile tmwhite(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - tmwhite deletion."
-								Err.Clear
-							End If
-						End If
-					Else 
-						Set file = Nothing
-						file = oFSO.GetFile(tmwhite(count))
-						If DateDiff("d",file.DateCreated,oDate) > 32 Then
-							oFile.WriteLine "    Deleting Trend signature File " & tmwhite(count)
-							oFSO.DeleteFile tmwhite(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - tmwhite deletion of highest numbered files."
-								Err.Clear
-							End If
-						Else
-							oFile.WriteLine "     Found " & tmwhite(count) & ", but it was within the 5 newest in its sequence and younger then 32 days old, so it was left untouched."
-						End If
-					End If
-				End If
-			Next
-		Else
-			oFile.WriteLine "      Did not find any tmwhite files..."
-		End If
-		If ircothHighest > 0 Then
-			Set count = Nothing
-			Set tempNumber = Nothing
-			For count = 0 to ircothCounter
-				tempNumber = Right(ircoth(count), 3)
-				If IsNumeric(tempNumber) Then
-					tempNumber = CInt(tempNumber)
-					If tempNumber < (ircothHighest - 4) Then
-						Set file = Nothing
-						file = oFSO.GetFile(ircoth(count))
-						If DateDiff("d",file.DateCreated,oDate) >= 14 Then
-							oFile.WriteLine "    Deleting Trend signature File " & ircoth(count)
-							oFSO.DeleteFile ircoth(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - irc$oth deletion."
-								Err.Clear
-							End If
-						End If
-					Else 
-						Set file = Nothing
-						file = oFSO.GetFile(ircoth(count))
-						If DateDiff("d",file.DateCreated,oDate) > 32 Then
-							oFile.WriteLine "    Deleting Trend signature File " & ircoth(count)
-							oFSO.DeleteFile ircoth(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - irc$oth deletion of highest numbered files."
-								Err.Clear
-							End If
-						Else
-							oFile.WriteLine "     Found " & ircoth(count) & ", but it was within the 5 newest in its sequence and younger then 32 days old, so it was left untouched."
-						End If
-					End If
-				End If
-			Next
-		Else
-			oFile.WriteLine "      Did not find any irc$oth files..."
-		End If
-		If icrcothHighest > 0 Then
-			Set count = Nothing
-			Set tempNumber = Nothing
-			For count = 0 to icrcothCounter
-				tempNumber = Right(icrcoth(count), 3)
-				If IsNumeric(tempNumber) Then
-					tempNumber = CInt(tempNumber)
-					If tempNumber < (icrcothHighest - 4) Then
-						Set file = Nothing
-						file = oFSO.GetFile(icrcoth(count))
-						If DateDiff("d",file.DateCreated,oDate) >= 14 Then
-							oFile.WriteLine "    Deleting Trend signature File " & icrcoth(count)
-							oFSO.DeleteFile icrcoth(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - icrc$oth deletion."
-								Err.Clear
-							End If
-						End If
-					Else 
-						Set file = Nothing
-						file = oFSO.GetFile(icrcoth(count))
-						If DateDiff("d",file.DateCreated,oDate) > 32 Then
-							oFile.WriteLine "    Deleting Trend signature File " & icrcoth(count)
-							oFSO.DeleteFile icrcoth(count), True
-							If Err.Number <> 0 Then
-								oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 23 - icrc$oth deletion of highest numbered files."
-								Err.Clear
-							End If
-						Else
-							oFile.WriteLine "     Found " & icrcoth(count) & ", but it was within the 5 newest in its sequence and younger then 32 days old, so it was left untouched."
-						End If
-					End If
-				End If
-			Next
-		Else
-			oFile.WriteLine "      Did not find any icrc$oth files..."
-		End If
-	Else
-		If Len(sRegContent) > 0 Then
-			oFile.WriteLine "Found registry keys for Trend, but the detected installation folder """ & sRegContent & """ was not found."
-		Else
-			oFile.WriteLine "Found registry keys for Trend, but the detected installation folder was not found."
-		End If
-		oFile.WriteLine "      Skipping..."
-	End If
-End If 
-'	Show Progress as dots:
+' Environment-specific cleanup step removed from the public version.
 DisplayProgress(1)
 Err.Clear
 
@@ -1386,46 +840,11 @@ Next
 '	Show Progress as dots:
 DisplayProgress(1)
 
-'		26. Se etter Sectra RIS logg filer å komprimere:
-If regValueExists("HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Sectra\Installer\Products\SectraDeploymentAgent\Instances\default\Versions\15.1.10.8\InstalledDirs\Directory0") Then
-	sRegContent = ReadReg("HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Sectra\Installer\Products\SectraDeploymentAgent\Instances\default\Versions\15.1.10.8\InstalledDirs\Directory0")
-	oFile.WriteLine "Detected Sectra RIS version 15.1.10.8 " & sRegContent
-	If Not Right(sRegContent,1) = "\" Then
-		sRegContent = sRegContent & "\"
-	End If
-	If oFSO.FolderExists(sRegContent & "Packages\default\RisAppServer.15.1.9.9\ServerComponents") Then 
-		oFile.WriteLine "Archiving """ & sRegContent & "Packages\default\RisAppServer.15.1.9.9\ServerComponents\*.log"""
-		oShell.run "compact /c /s """ & sRegContent & "Packages\default\RisAppServer.15.1.9.9\ServerComponents\*.log"""" /i /q /f", 1, true
-		If Err.Number <> 0 Then
-			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 27."
-			Err.Clear
-		End If
-	End If
-	If oFSO.FolderExists("" & sSystemDrive & "\Program Files (x86)\Sectra\CDS\SavedLogs") Then 
-		oFile.WriteLine "Archiving """ & sSystemDrive & "\Program Files (x86)\Sectra\CDS\SavedLogs"""
-		oShell.run "compact /c /s """ & sSystemDrive & "\Program Files (x86)\Sectra\CDS\SavedLogs"""" /i /q /f", 1, true
-		If Err.Number <> 0 Then
-			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 27."
-			Err.Clear
-		End If
-	End If
-End If
-'	Show Progress as dots:
+' Environment-specific cleanup step removed from the public version.
 DisplayProgress(1)
+Err.Clear
 
-'	27. Hvis tsm_images finnes på rota av systemdisk, kan vi fjerne denne:
-If oFSO.FolderExists(sSystemDrive & "\tsm_images") Then
-	oFile.WriteLine "Deleting " & sSystemDrive & "\tsm_images"
-	oFSO.DeleteFolder sSystemDrive & "\tsm_images", True	
-	If Err.Number <> 0 Then
-		oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 28."
-		Err.Clear
-	End If
-Else
-	oFile.WriteLine "Did not find " & sSystemDrive & "\tsm_images"
-	oFile.WriteLine "      Skipping..."
-End If
-'	Show Progress as dots:
+' Environment-specific cleanup step removed from the public version.
 DisplayProgress(1)
 Err.Clear
 
@@ -1445,61 +864,12 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'  29. Rydd Systemdisk\Omnigate\LOG og Systemdisk\Omnigate\Alerts.
-If oFSO.FolderExists(sSystemDrive & "\OMNIGATE\ALERTS") Then	
-	Set oLocation = oFSO.GetFolder(sSystemDrive & "\OMNIGATE\ALERTS")
-	oFile.WriteLine "Deleting files older then 18 days in " & sSystemDrive & "\OMNIGATE\ALERTS"
-	For each file In oLocation.Files
-		If DateDiff("d",file.DateCreated,oDate) >= 18 Then
-			oFile.WriteLine "Deleting " & file.Path & " with size " & FormatNumber(((file.Size / 1024) / 1024),2) & " MB - it is more then 18 days since it was last modified"
-			file.Delete True
-			If Err.Number <> 0 Then
-				oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 30 when deleting files in alerts folder."
-				Err.Clear
-			End If
-		End If
-	Next
-	oFile.WriteLine "Compressing " & sSystemDrive & "\OMNIGATE\ALERTS"
-	oShell.run "compact /c /s """ & sSystemDrive & "\OMNIGATE\ALERTS"""" /i /q /f", 1, true
-	If Err.Number <> 0 Then
-		oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 30."
-		Err.Clear
-	End If
-Else
-	oFile.WriteLine "Did not find " & sSystemDrive & "\OMNIGATE\ALERTS"
-	oFile.WriteLine "      Skipping..."
-End If
-Err.Clear
-
-If oFSO.FolderExists(sSystemDrive & "\OMNIGATE\LOG") Then	
-	Set oLocation = oFSO.GetFolder(sSystemDrive & "\OMNIGATE\LOG")
-	oFile.WriteLine "Deleting files older then 21 days in " & sSystemDrive & "\OMNIGATE\LOG"
-	For each file In oLocation.Files
-		If DateDiff("d",file.DateCreated,oDate) >= 21 Then
-			oFile.WriteLine "Deleting " & file.Path & " with size " & FormatNumber(((file.Size / 1024) / 1024),2) & " MB - it is more then 21 days since it was last modified"
-			file.Delete True
-			If Err.Number <> 0 Then
-				oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 30 when deleting files in LOG folder."
-				Err.Clear
-			End If
-		End If
-	Next
-	oFile.WriteLine "Compressing " & sSystemDrive & "\OMNIGATE\LOG"
-	oShell.run "compact /c /s """ & sSystemDrive & "\OMNIGATE\LOG"""" /i /q /f", 1, true
-	If Err.Number <> 0 Then
-		oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 30."
-		Err.Clear
-	End If
-Else
-	oFile.WriteLine "Did not find " & sSystemDrive & "\OMNIGATE\LOG"
-	oFile.WriteLine "      Skipping..."
-End If
-'	Show Progress as dots:
+' Environment-specific cleanup step removed from the public version.
 DisplayProgress(1)
 Err.Clear
 
 '	30. Brukerprofilrydding:
-'		1. Delete C:\Users\%user%\AppData\Local\Temp\*.*  (%temp%)
+'		1. Delete files from each discovered user profile's local temporary directory.
 If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive & "\Documents And Settings") Then
 	set oLocation = Nothing
 	set folder = Nothing
@@ -1512,7 +882,7 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 	oFile.WriteLine "Checking user profiles temp folder: " & oLocation
 	For each folder In oLocation.Subfolders
 		If Not folder is Nothing And Not IsNull(folder) And Not IsEmpty(folder) Then
-			If StrComp(folder.Name,"All Users", 1) AND StrComp(folder.Name,"Alle Brukere", 1) AND StrComp(folder.Name,"Default", 1) AND StrComp(folder.Name,"Default User", 1) Then
+			If Not IsProtectedProfileName(folder.Name, sCurrentProfileName) Then
 				If Err.Number <> 0 Then
 					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ")  at point 4."
 					Err.Clear
@@ -1579,7 +949,7 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	31. Fontcache rydding - cmd streng fra Jarle Hansen:
+'	31. Font cache cleanup:
 '		forfiles /P C:\Windows\
 If oFSO.FolderExists(sSystemDrive & "\ServiceProfiles\LocalService\AppData\Local") Then
 	oFile.WriteLine "Cleaning op FontCache Files in " & sSystemDrive & "\ServiceProfiles\LocalService\AppData\Local"
@@ -1703,3 +1073,11 @@ Function deletePatchCache(oFile)
 	oShell.run "rmdir /Q /S " & sSystemRoot & "\installer\$PatchCache$", 1, true
 	oFSO.DeleteFolder sSystemRoot & "\installer\$PatchCache$", True
 End Function
+
+Sub LoadLibrary(libraryPath)
+	Dim libraryFile, librarySource
+	Set libraryFile = oFSO.OpenTextFile(libraryPath, 1, False)
+	librarySource = libraryFile.ReadAll
+	libraryFile.Close
+	ExecuteGlobal librarySource
+End Sub
