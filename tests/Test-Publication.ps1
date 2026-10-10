@@ -46,6 +46,8 @@ Assert-True ($scriptText.Contains('CanDeletePath(folder.Path, oLocation.Path)'))
 Assert-True ($scriptText.Contains('folder.Attributes And 1024')) 'Profile deletion does not reject reparse points'
 Assert-True ($scriptText.Contains('WScript.Arguments.Named.Exists("execute")')) 'Destructive execution is not protected by an explicit /execute switch'
 Assert-True ($scriptText.Contains('WScript.Arguments.Named.Exists("ccleaner")')) 'CCleaner does not require an explicit /ccleaner switch'
+Assert-True ($scriptText.Contains('WScript.Arguments.Named.Exists("help")')) 'The script does not support a /help switch'
+Assert-True ($scriptText.Contains('Function FindUnsupportedArgument')) 'Unsupported arguments are not rejected'
 Assert-True ($scriptText.Contains('If Not executionEnabled Then')) 'The script does not default to preview-only mode'
 Assert-True ($scriptText.Contains('Delivery Optimization Files')) 'Modern Delivery Optimization cleanup is not configured'
 Assert-True ($scriptText.Contains('DirectX Shader Cache')) 'Modern DirectX shader-cache cleanup is not configured'
@@ -87,6 +89,17 @@ Assert-True ($previewOutput -match '(?i)no files, registry values, services, or 
 $ccleanerPreviewOutput = & cscript.exe //nologo $scriptPath /ccleaner 2>&1 | Out-String
 Assert-True ($LASTEXITCODE -eq 0) 'CCleaner without /execute returned a failure exit code'
 Assert-True ($ccleanerPreviewOutput -match '(?i)preview only') 'The /ccleaner switch bypassed preview-only mode without /execute'
+
+$helpOutput = & cscript.exe //nologo $scriptPath /help 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 0) '/help returned a failure exit code'
+Assert-True ($helpOutput -match '(?i)arguments:') '/help did not display an argument list'
+Assert-True ($helpOutput -match '(?i)/execute') '/help omitted the /execute argument'
+Assert-True ($helpOutput -match '(?i)/ccleaner') '/help omitted the /ccleaner argument'
+Assert-True ($helpOutput -match '(?i)/help.+/\?') '/help omitted its help aliases'
+
+$unknownOutput = & cscript.exe //nologo $scriptPath /unknown 2>&1 | Out-String
+Assert-True ($LASTEXITCODE -eq 2) 'An unsupported argument did not return exit code 2'
+Assert-True ($unknownOutput -match '(?i)unsupported argument.+/unknown') 'An unsupported argument did not produce a useful error'
 
 $temporaryScript = Join-Path ([IO.Path]::GetTempPath()) ("ryddeScript-syntax-{0}.vbs" -f [guid]::NewGuid())
 try {

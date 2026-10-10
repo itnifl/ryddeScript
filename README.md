@@ -74,6 +74,19 @@ GitHub Actions is configured to run both commands for every pull request and eve
 
 ### Historical invocation
 
+Supported arguments can be displayed at any time without elevation or system changes:
+
+```bat
+cscript //nologo ryddeScript.vbs /help
+```
+
+| Argument | Effect |
+| --- | --- |
+| No arguments | Display the non-destructive preview and argument list. |
+| `/execute` | Run the destructive legacy cleanup workflow. |
+| `/ccleaner` | Also run CCleaner Custom Clean; effective only with `/execute`. |
+| `/help` or `/?` | Display all supported arguments and exit without changes. |
+
 The safe default displays the execution plan without changing the machine:
 
 ```bat
@@ -106,7 +119,7 @@ The project is available under the [MIT License](LICENSE). Anyone may use, copy,
 
 **«Rydde» betyr å ordne eller gjøre rent. `ryddeScript` betyr derfor «ryddeskript».**
 
-Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det beskytter repoet og mapper som inneholder det, og kan rydde midlertidige filer som er eldre enn sju dager. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/execute` må oppgis for å kjøre oppryddingen. CCleaner kjøres bare når både `/execute` og `/ccleaner` er oppgitt, og bruker da CCleaners egne lagrede valg.
+Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det beskytter repoet og mapper som inneholder det, og kan rydde midlertidige filer som er eldre enn sju dager. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/help` viser alle argumenter, og `/execute` må oppgis for å kjøre oppryddingen. CCleaner kjøres bare når både `/execute` og `/ccleaner` er oppgitt, og bruker da CCleaners egne lagrede valg.
 
 Skriptet kan slette filer, profildata, skyggekopier, gjenopprettingspunkter og installasjonsbuffere. Det er historisk kode og er **ikke trygt å kjøre som publisert**. Les hele kildekoden, innfør en reell tørrkjøringsmodus, ta sikkerhetskopi og test i en midlertidig virtuell maskin først.
 

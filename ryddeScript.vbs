@@ -1,4 +1,4 @@
-''Version 1.497-public
+''Version 1.498-public
 
 ' ryddeScript means "cleanup script" in Norwegian.
 ' This public legacy edition contains only generic Windows and server-role logic.
@@ -14,13 +14,15 @@ On Error Resume Next
 
 Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogRoot, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
 Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore, sCurrentProfileName
-Dim versionInfo, executionEnabled, ccleanerEnabled, relaunchArguments, sProtectedRoot
-versionInfo = "1.497-public"
+Dim versionInfo, executionEnabled, ccleanerEnabled, helpRequested, invalidArgument, relaunchArguments, sProtectedRoot
+versionInfo = "1.498-public"
 executionEnabled = WScript.Arguments.Named.Exists("execute")
 ccleanerEnabled = WScript.Arguments.Named.Exists("ccleaner")
+helpRequested = WScript.Arguments.Named.Exists("help") Or WScript.Arguments.Named.Exists("?")
 relaunchArguments = ""
 If executionEnabled Then relaunchArguments = " /execute"
 If ccleanerEnabled Then relaunchArguments = relaunchArguments & " /ccleaner"
+If helpRequested Then relaunchArguments = relaunchArguments & " /help"
 
 oDate = date()
 strDate = CDate(oDate)
@@ -55,6 +57,19 @@ If sProcess_architecture = "x86" Then
 End If
 
 Call forceUseCScript
+
+invalidArgument = FindUnsupportedArgument()
+If Len(invalidArgument) > 0 Then
+	WScript.Echo "Unsupported argument: " & invalidArgument
+	WScript.Echo ""
+	Call PrintUsage
+	WScript.Quit 2
+End If
+
+If helpRequested Then
+	Call PrintUsage
+	WScript.Quit 0
+End If
 
 If Not executionEnabled Then
 	Call PrintExecutionPlan
@@ -1063,11 +1078,40 @@ Sub PrintExecutionPlan
 	WScript.Echo "component-store data, inactive profiles, restore points, and shadow copies."
 	WScript.Echo ""
 	WScript.Echo "WARNING: /execute enables the complete destructive legacy workflow."
-	WScript.Echo "Review the source, backups, and target machine before using:"
-	WScript.Echo "  cscript //nologo ryddeScript.vbs /execute"
-	WScript.Echo "Optional CCleaner Custom Clean:"
-	WScript.Echo "  cscript //nologo ryddeScript.vbs /execute /ccleaner"
+	WScript.Echo "Review the source, backups, and target machine before using it."
+	WScript.Echo ""
+	Call PrintUsage
 End Sub
+
+Sub PrintUsage
+	WScript.Echo "Usage:"
+	WScript.Echo "  cscript //nologo ryddeScript.vbs [arguments]"
+	WScript.Echo ""
+	WScript.Echo "Arguments:"
+	WScript.Echo "  /execute    Run the destructive cleanup workflow."
+	WScript.Echo "  /ccleaner   Also run CCleaner Custom Clean; requires /execute."
+	WScript.Echo "  /help, /?   Display this help and exit without making changes."
+	WScript.Echo ""
+	WScript.Echo "No arguments: display a non-destructive preview."
+End Sub
+
+Function FindUnsupportedArgument
+	Dim argumentName
+	FindUnsupportedArgument = ""
+	If WScript.Arguments.Unnamed.Count > 0 Then
+		FindUnsupportedArgument = WScript.Arguments.Unnamed.Item(0)
+		Exit Function
+	End If
+	For Each argumentName In WScript.Arguments.Named
+		Select Case LCase(CStr(argumentName))
+			Case "execute", "ccleaner", "help", "?", "elevated"
+				' Supported public options plus the internal elevation marker.
+			Case Else
+				FindUnsupportedArgument = "/" & CStr(argumentName)
+				Exit Function
+		End Select
+	Next
+End Function
 Function ReadReg(RegPath)
 	On Error Resume Next
     ReadReg = oShell.RegRead(RegPath)
