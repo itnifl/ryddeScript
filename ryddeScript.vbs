@@ -1,4 +1,4 @@
-''Version 1.495-public
+''Version 1.498-public
 
 ' ryddeScript means "cleanup script" in Norwegian.
 ' This public legacy edition contains only generic Windows and server-role logic.
@@ -12,13 +12,17 @@
 Option Explicit
 On Error Resume Next
 
-Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
+Dim oShell, oFSO, oProcEnv, oDate, sSystemDrive, sSystemRoot, sProcess_architecture, objRE, oReg, sRegContent, sLogRoot, sLogLocation, sLogFileName, oLogLocation, oFile, oFiles, oLocation
 Dim file, folder, disk, count, strDate, strDay, strMonth, strYear, sSystem_architecture, oFolderRoot, progressCount, progressMax, strDiskBefore, sCurrentProfileName
-Dim versionInfo, executionEnabled, relaunchArguments
-versionInfo = "1.495-public"
+Dim versionInfo, executionEnabled, ccleanerEnabled, helpRequested, invalidArgument, relaunchArguments, sProtectedRoot
+versionInfo = "1.498-public"
 executionEnabled = WScript.Arguments.Named.Exists("execute")
+ccleanerEnabled = WScript.Arguments.Named.Exists("ccleaner")
+helpRequested = WScript.Arguments.Named.Exists("help") Or WScript.Arguments.Named.Exists("?")
 relaunchArguments = ""
 If executionEnabled Then relaunchArguments = " /execute"
+If ccleanerEnabled Then relaunchArguments = relaunchArguments & " /ccleaner"
+If helpRequested Then relaunchArguments = relaunchArguments & " /help"
 
 oDate = date()
 strDate = CDate(oDate)
@@ -32,13 +36,14 @@ progressCount = 0
 
 set oShell = wScript.createObject("wScript.shell")
 set oFSO = CreateObject("Scripting.FileSystemObject")
-LoadLibrary oFSO.BuildPath(oFSO.GetParentFolderName(WScript.ScriptFullName), "lib\RyddeDecisions.vbs")
+sProtectedRoot = oFSO.GetParentFolderName(WScript.ScriptFullName)
+LoadLibrary oFSO.BuildPath(sProtectedRoot, "lib\RyddeDecisions.vbs")
 Set oProcEnv = oShell.Environment("Process")
 sSystemDrive = oShell.ExpandEnvironmentStrings("%SYSTEMDRIVE%")
 sSystemRoot = oShell.ExpandEnvironmentStrings("%SYSTEMROOT%")
 sCurrentProfileName = oFSO.GetFileName(oShell.ExpandEnvironmentStrings("%USERPROFILE%"))
-'sLogLocation = sSystemDrive & "\ryddeScriptLogs"
-sLogLocation = oFSO.GetParentFolderName(Wscript.ScriptFullName)
+sLogRoot = oFSO.BuildPath(oShell.ExpandEnvironmentStrings("%ProgramData%"), "ryddeScript")
+sLogLocation = oFSO.BuildPath(sLogRoot, "Logs")
 sLogFileName = "ryddeLog-" & strDay & "." & strMonth & "." & strYear & ".log"
 'sProcess_architecture = oProcEnv("PROCESSOR_ARCHITECTURE")
 'sProcess_architecture = ReadReg("HKLM\SYSTEM\ControlSet001\Control\Session Manager\Environment\PROCESSOR_ARCHITECTURE")
@@ -53,6 +58,19 @@ End If
 
 Call forceUseCScript
 
+invalidArgument = FindUnsupportedArgument()
+If Len(invalidArgument) > 0 Then
+	WScript.Echo "Unsupported argument: " & invalidArgument
+	WScript.Echo ""
+	Call PrintUsage
+	WScript.Quit 2
+End If
+
+If helpRequested Then
+	Call PrintUsage
+	WScript.Quit 0
+End If
+
 If Not executionEnabled Then
 	Call PrintExecutionPlan
 	WScript.Quit 0
@@ -65,6 +83,9 @@ Else
 End If
 
 '	1. Sette opp loggrotering i scriptet.
+If Not oFSO.FolderExists(sLogRoot) Then
+	oFSO.CreateFolder sLogRoot
+End If
 If Not oFSO.FolderExists(sLogLocation) Then
 	oFSO.CreateFolder sLogLocation
 End If
@@ -72,8 +93,8 @@ End If
 Set oFile = oFSO.CreateTextFile(sLogLocation & "\" & sLogFileName, True)
 Set oLogLocation = oFSO.GetFolder(sLogLocation)
 For each file In oLogLocation.Files	 
-	If (DateDiff("d",file.DateCreated,oDate) >= 14) AND (StrComp(oFSO.GetExtensionName(file.Name),"log",1) = 0) Then 
-		file.Delete True
+	If (DateDiff("d",file.DateCreated,oDate) >= 14) AND (LCase(Left(file.Name, 9)) = "ryddelog-") AND (StrComp(oFSO.GetExtensionName(file.Name),"log",1) = 0) Then
+		SafeDeleteFile file.Path, True
 	End If
 Next
 
@@ -220,17 +241,11 @@ End If
 DisplayProgress(1)
 Err.Clear
 
-'	8. Run CCleaner through its command-line interface when it is already installed.
-If oFSO.fileExists(sSystemDrive & "\Program Files\CCleaner\CCleaner.exe")  Then
-	oFile.WriteLine "Starting CCleaner.exe and cleaning out what we can.."
-	oShell.run """" & sSystemDrive & "\Program Files\CCleaner\CCleaner.exe"" /AUTO", 1, true
-	If Err.Number <> 0 Then
-		oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 8."
-		Err.Clear
-	End If
+'	8. Run CCleaner only after explicit /execute /ccleaner opt-in.
+If ccleanerEnabled Then
+	RunOptionalCCleaner
 Else
-	oFile.WriteLine "Did not find " & sSystemDrive & "\Program Files\CCleaner\CCleaner.exe"
-	oFile.WriteLine "      Skipping..."
+	oFile.WriteLine "Skipping CCleaner; use /execute /ccleaner to opt in."
 End If
 '	Show Progress as dots:
 DisplayProgress(1)
@@ -255,7 +270,7 @@ Err.Clear
 '	10. Remove Windows memory dump files from standard Windows locations.
 If oFSO.fileExists(sSystemRoot & "\MEMORY.DMP")  Then
 	oFile.WriteLine "Deleting MEMORY.DMP.."
-	oFSO.DeleteFile(sSystemRoot & "\MEMORY.DMP")
+	SafeDeleteFile sSystemRoot & "\MEMORY.DMP", True
 	If Err.Number <> 0 Then
 		oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 10."
 		Err.Clear
@@ -267,7 +282,7 @@ End If
 Err.Clear
 If oFSO.FolderExists(sSystemRoot & "\Minidump")  Then
 	oFile.WriteLine "Deleting " & sSystemRoot & "\Minidump\*.*"
-	oFSO.DeleteFile(sSystemRoot & "\Minidump\*.*")
+	CleanFilesInFolder sSystemRoot & "\Minidump"
 	If Err.Number <> 0 Then
 		oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 10."
 		Err.Clear
@@ -286,7 +301,7 @@ If oFSO.fileExists(sSystemDrive & "\hiberfil.sys")  Then
 	End If
 	If oFSO.fileExists(sSystemDrive & "\hiberfil.sys")  Then
 		oFile.WriteLine "Deleting " & sSystemDrive & "\hiberfil.sys"
-		oFSO.DeleteFile sSystemDrive & "\hiberfil.sys", True
+		SafeDeleteFile sSystemDrive & "\hiberfil.sys", True
 		If Err.Number <> 0 Then
 			oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 10."
 			Err.Clear
@@ -324,7 +339,7 @@ If oFSO.FolderExists(sSystemDrive & "\inetpub\logs\LogFiles\")  Then
 		If objRE.Test(file.Name) Then
 			If DateDiff("d",file.DateCreated,oDate) >= 14 Then
 				oFile.WriteLine "Deleting " & file.Path & " with size " & FormatNumber(((file.Size / 1024) / 1024),2) & " MB - it is more then 14 days since it was last modified"
-				file.Delete True
+				SafeDeleteFile file.Path, True
 				If Err.Number <> 0 Then
 					oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 11 when deleting files in log folder."
 					Err.Clear
@@ -347,7 +362,7 @@ If oFSO.FolderExists(sSystemDrive & "\inetpub\logs\LogFiles\")  Then
 			If objRE.Test(subFile.Name) Then
 				If DateDiff("d",subFile.DateCreated,oDate) >= 14 Then
 					oFile.WriteLine "Deleting " & subFile.Path & " with size " & FormatNumber(((subFile.Size / 1024) / 1024),2) & " MB - it is more then 14 days since it was last modified"
-					subFile.Delete True
+					SafeDeleteFile subFile.Path, True
 					If Err.Number <> 0 Then
 						oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 11 when deleting subfiles in subfolders in log folder.."
 						Err.Clear
@@ -375,7 +390,7 @@ If oFSO.FolderExists(sSystemRoot & "\SYSTEM32\LogFiles\")  Then
 		For Each subFolderFile in system32SubFolder.Files 
 			If DateDiff("d",subFolderFile.DateCreated,oDate) >= 14 Then
 					oFile.WriteLine "Deleting " & subFolderFile.Path & " with size " & FormatNumber(((subFolderFile.Size / 1024) / 1024),2) & " MB - it is more then 14 days since it was last modified"
-					subFolderFile.Delete True
+					SafeDeleteFile subFolderFile.Path, True
 					If Err.Number <> 0 Then
 						oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 11 when deleting subfiles in subfolders in system32 log folder.."
 						Err.Clear
@@ -496,7 +511,7 @@ For each folder In oFolderRoot.SubFolders
 	If objRE.Test(folder.Name) Then
 		If oFSO.FolderExists(folder.Path) AND DateDiff("d",folder.DateCreated,oDate) >= 30 Then 
 			oFile.WriteLine "Deleting " & folder.Path
-			oFSO.DeleteFolder folder.Path, True
+			SafeDeleteFolder folder.Path, True
 			If Err.Number <> 0 Then
 				oFile.WriteLine "    An error was encountered (" & Err.Number & " - " & Err.Description & ") at point 14."
 				Err.Clear
@@ -643,7 +658,7 @@ If oFSO.FolderExists(sSystemDrive & "\Temp") Then
 		'On Error Goto 0
 		If DateDiff("d",folder.DateLastModified,oDate) >= 7 Then 
 			oFile.WriteLine "Deleting " & folder.Path & " with size " & folderSize & " MB - it is more then 7 days since it was last modified"
-			oFSO.DeleteFolder folder.Path, True
+			SafeDeleteFolder folder.Path, True
 		End If
 	Next
 	Set oFiles = oLocation.Files
@@ -656,7 +671,7 @@ If oFSO.FolderExists(sSystemDrive & "\Temp") Then
 		'On Error Goto 0
 		If DateDiff("d",file.DateLastModified,oDate) >= 7 Then 
 			oFile.WriteLine "Deleting " & file.Path & " with size " & FormatNumber(((file.Size / 1024) / 1024),2) & " MB - it is more then 7 days since it was last modified"
-			file.Delete True
+			SafeDeleteFile file.Path, True
 		End If
 	Next
 Else
@@ -666,6 +681,12 @@ End If
 '	Show Progress as dots:
 DisplayProgress(1)
 Err.Clear
+
+' Clean the current process account's temporary files only when they are at least
+' seven days old. Repository protection also applies if the checkout is under TEMP.
+Dim sCurrentTempPath
+sCurrentTempPath = oShell.ExpandEnvironmentStrings("%TEMP%")
+CleanOldTemporaryItems sCurrentTempPath, 7
 
 '	21. Brukerprofiler:
 '		1. Slett brukerprofiler som har modified date senere enn 7 dager siden(ikke vært brukt på en uke) og er større enn 300 MB
@@ -693,7 +714,7 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 				'On Error Goto 0
 				If IsOlderThanDays(folder.DateLastModified, oDate, 7) AND folderSizeMB > 300 AND CanDeletePath(folder.Path, oLocation.Path) AND ((folder.Attributes And 1024) = 0) Then
 					oFile.WriteLine "Deleting """ & folder.Path & """ with size " & folderSize & " MB - it is more then 7 days since last modification and larger then 300 MB"
-					oFSO.DeleteFolder folder.Path, True
+					SafeDeleteFolder folder.Path, True
 				Else
 					oFile.WriteLine "Checked """ & folder.Path & """ but its space usage was either less then the set limit, or it has been used the last seven days"
 					oFile.WriteLine "		- no action taken against this folder..."
@@ -727,7 +748,7 @@ If folder.Files.Count > 0 Then
 	for each f In folder.Files
 		On Error Resume Next
 		oFile.WriteLine "	Deleting: " & f.Path
-		f.Delete True   
+		SafeDeleteFile f.Path, True
 		If Err.Number <> 0 Then
 			oFile.WriteLine "	Error deleting: " & f.name & " - (" & Err.Number & " - " & Err.Description & ") at point 24 - " & sSystemRoot & "\temp\* file deletion."
 		End If
@@ -742,7 +763,7 @@ If folder.SubFolders.Count > 0 Then
 			for each f In folderHolder.Files
 				On Error Resume Next
 				oFile.WriteLine "	Deleting: " & f.Path
-				f.Delete True   
+				SafeDeleteFile f.Path, True
 				If Err.Number <> 0 Then
 					oFile.WriteLine "	Error deleting: " & f.name & " - (" & Err.Number & " - " & Err.Description & ") at point 24 - " & sSystemRoot & "\temp\" & folderHolder.name & "\* file deletion."
 				End If
@@ -753,7 +774,7 @@ If folder.SubFolders.Count > 0 Then
 		On Error Resume Next
 		Err.Clear
 				oFile.WriteLine "	Deleting: " & folderHolder.Path
-		folderHolder.Delete True	
+		SafeDeleteFolder folderHolder.Path, True
 		If Err.Number <> 0 Then
 			oFile.WriteLine "	Error deleting: " & folderHolder.name & " - (" & Err.Number & " - " & Err.Description & ") at point 24 - " & sSystemRoot & "\temp\* folder deletion."
 		End If
@@ -827,7 +848,7 @@ For Each f in folder.Files
 			oFile.WriteLine "	" & f.Path & " was not in the exclude list but has the system file attribute set, skipping it."
 		Else
 			oFile.WriteLine "	Deleting: " & f.Path
-			f.Delete True
+			SafeDeleteFile f.Path, True
 			If Err.Number <> 0 Then
 				oFile.WriteLine "	Error deleting: " & f.name & " - (" & Err.Number & " - " & Err.Description & ") at point 25 - " & sSystemDrive & "\* file deletion."
 			End If
@@ -895,7 +916,7 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 						for each f In oTempFolder.Files
 							On Error Resume Next
 							oFile.WriteLine "	Deleting: " & f.Path
-							f.Delete True   
+							SafeDeleteFile f.Path, True
 							If Err.Number <> 0 Then
 								oFile.WriteLine "	Error deleting: " & f.name & " - (" & Err.Number & " - " & Err.Description & ") at point 5 - " & oTempFolder.Path & "\* file deletion."
 							End If
@@ -910,7 +931,7 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 								for each f In folderHolder.Files
 									On Error Resume Next
 									oFile.WriteLine "	Deleting: " & f.Path
-									f.Delete True   
+									SafeDeleteFile f.Path, True
 									If Err.Number <> 0 Then
 										oFile.WriteLine "	Error deleting: " & f.name & " - (" & Err.Number & " - " & Err.Description & ") at point 5 - " & sSystemRoot & "\temp\" & folderHolder.name & "\* file deletion."
 									End If
@@ -924,7 +945,7 @@ If oFSO.FolderExists(sSystemDrive & "\Users") OR oFSO.FolderExists(sSystemDrive 
 							' Ignore bginfo.bmp in temp folder to prevent scclient.exe bug.
 							IF folderHolder.Path <> (folder.Path & "\AppData\Local\Temp\1") AND folderHolder.Path <> (folder.Path & "\AppData\Local\Temp\2") THEN
 								oFile.WriteLine "	Deleting: " & folderHolder.Path
-								folderHolder.Delete True
+								SafeDeleteFolder folderHolder.Path, True
 							ELSE
 								oFile.WriteLine "	Ignoring : " & folderHolder.Path & " due to SCClient.exe bug."
 							End If
@@ -954,7 +975,7 @@ Dim fontCachePath
 fontCachePath = sSystemRoot & "\ServiceProfiles\LocalService\AppData\Local"
 If oFSO.FolderExists(fontCachePath) Then
 	oFile.WriteLine "Cleaning up FontCache files in " & fontCachePath
-	oShell.run "forfiles.exe /P """ & fontCachePath & """ /M FontCache* /D -30 /C ""cmd /c del /q @path""", 1, true
+	CleanOldMatchingFilesInFolder fontCachePath, "fontcache", 30
 	If Err.Number <> 0 Then
 		oFile.WriteLine "	Error cleaning up FontCache files: - (" & Err.Number & " - " & Err.Description & ") at point 31."
 	End If
@@ -1002,7 +1023,7 @@ End Sub
 Sub forceAsAdmin
 	If WScript.Arguments.Named.Exists("elevated") = False Then 
 		'oShell.Popup "Scriptet ble ikke startet som admin. Starter igjen med cscript og som admin...",3,"Manglende admin"
-		CreateObject("Shell.Application").ShellExecute WScript.Path & "\cscript.exe", """" & WScript.ScriptFullName & """ /elevated /execute", "", "runas", 1
+		CreateObject("Shell.Application").ShellExecute WScript.Path & "\cscript.exe", """" & WScript.ScriptFullName & """ /elevated" & relaunchArguments, "", "runas", 1
 		WScript.Quit 0
 	End If
 End Sub
@@ -1057,9 +1078,40 @@ Sub PrintExecutionPlan
 	WScript.Echo "component-store data, inactive profiles, restore points, and shadow copies."
 	WScript.Echo ""
 	WScript.Echo "WARNING: /execute enables the complete destructive legacy workflow."
-	WScript.Echo "Review the source, backups, and target machine before using:"
-	WScript.Echo "  cscript //nologo ryddeScript.vbs /execute"
+	WScript.Echo "Review the source, backups, and target machine before using it."
+	WScript.Echo ""
+	Call PrintUsage
 End Sub
+
+Sub PrintUsage
+	WScript.Echo "Usage:"
+	WScript.Echo "  cscript //nologo ryddeScript.vbs [arguments]"
+	WScript.Echo ""
+	WScript.Echo "Arguments:"
+	WScript.Echo "  /execute    Run the destructive cleanup workflow."
+	WScript.Echo "  /ccleaner   Also run CCleaner Custom Clean; requires /execute."
+	WScript.Echo "  /help, /?   Display this help and exit without making changes."
+	WScript.Echo ""
+	WScript.Echo "No arguments: display a non-destructive preview."
+End Sub
+
+Function FindUnsupportedArgument
+	Dim argumentName
+	FindUnsupportedArgument = ""
+	If WScript.Arguments.Unnamed.Count > 0 Then
+		FindUnsupportedArgument = WScript.Arguments.Unnamed.Item(0)
+		Exit Function
+	End If
+	For Each argumentName In WScript.Arguments.Named
+		Select Case LCase(CStr(argumentName))
+			Case "execute", "ccleaner", "help", "?", "elevated"
+				' Supported public options plus the internal elevation marker.
+			Case Else
+				FindUnsupportedArgument = "/" & CStr(argumentName)
+				Exit Function
+		End Select
+	Next
+End Function
 Function ReadReg(RegPath)
 	On Error Resume Next
     ReadReg = oShell.RegRead(RegPath)
@@ -1076,15 +1128,125 @@ End Function
 Function deleteRecycleBin(oFile)
 	On Error Resume Next
 	oFile.WriteLine "Deleting " & sSystemDrive & "\$Recycle.Bin"
-	oFSO.DeleteFolder sSystemDrive & "\$Recycle.Bin", True
-	oShell.run "rmdir /Q /S " & sSystemDrive & "\$Recycle.Bin", 1, true
+	SafeDeleteFolder sSystemDrive & "\$Recycle.Bin", True
 End Function
 Function deletePatchCache(oFile)
 	On Error Resume Next
 	oFile.WriteLine "Deleting " & sSystemRoot & "\installer\$PatchCache$"
-	oShell.run "rmdir /Q /S " & sSystemRoot & "\installer\$PatchCache$", 1, true
-	oFSO.DeleteFolder sSystemRoot & "\installer\$PatchCache$", True
+	SafeDeleteFolder sSystemRoot & "\installer\$PatchCache$", True
 End Function
+
+Sub SafeDeleteFile(candidatePath, forceDelete)
+	Dim candidateFile
+	If IsPathProtected(candidatePath, sProtectedRoot) Then
+		oFile.WriteLine "PROTECTED - not deleting repository path: " & candidatePath
+		Exit Sub
+	End If
+	If InStr(candidatePath, "*") > 0 Or InStr(candidatePath, "?") > 0 Then
+		oFile.WriteLine "WILDCARD - not deleting unbounded file path: " & candidatePath
+		Exit Sub
+	End If
+	If oFSO.FileExists(candidatePath) Then
+		Set candidateFile = oFSO.GetFile(candidatePath)
+		If (candidateFile.Attributes And 1024) <> 0 Then
+			oFile.WriteLine "REPARSE POINT - not deleting file: " & candidatePath
+			Exit Sub
+		End If
+	End If
+	oFSO.DeleteFile candidatePath, forceDelete
+End Sub
+
+Sub SafeDeleteFolder(candidatePath, forceDelete)
+	Dim candidateFolder, childFile, childFolder
+	If IsPathProtected(candidatePath, sProtectedRoot) Then
+		oFile.WriteLine "PROTECTED - not deleting repository path or ancestor: " & candidatePath
+		Exit Sub
+	End If
+	If oFSO.FolderExists(candidatePath) Then
+		Set candidateFolder = oFSO.GetFolder(candidatePath)
+		If (candidateFolder.Attributes And 1024) <> 0 Then
+			oFile.WriteLine "REPARSE POINT - not deleting folder: " & candidatePath
+			Exit Sub
+		End If
+		For Each childFile In candidateFolder.Files
+			SafeDeleteFile childFile.Path, forceDelete
+		Next
+		For Each childFolder In candidateFolder.SubFolders
+			SafeDeleteFolder childFolder.Path, forceDelete
+		Next
+		If candidateFolder.Files.Count > 0 Or candidateFolder.SubFolders.Count > 0 Then
+			oFile.WriteLine "NOT EMPTY - retained protected or in-use folder: " & candidatePath
+			Exit Sub
+		End If
+	End If
+	oFSO.DeleteFolder candidatePath, False
+End Sub
+
+Sub CleanFilesInFolder(folderPath)
+	Dim targetFolder, targetFile
+	If Not oFSO.FolderExists(folderPath) Then Exit Sub
+	Set targetFolder = oFSO.GetFolder(folderPath)
+	For Each targetFile In targetFolder.Files
+		SafeDeleteFile targetFile.Path, True
+	Next
+End Sub
+
+Sub CleanOldTemporaryItems(tempPath, minimumDays)
+	Dim tempFolder, tempFile, tempSubfolder
+	If Not oFSO.FolderExists(tempPath) Then Exit Sub
+	Set tempFolder = oFSO.GetFolder(tempPath)
+	oFile.WriteLine "Cleaning temporary items older than " & minimumDays & " days in " & tempFolder.Path
+
+	For Each tempFile In tempFolder.Files
+		If IsOlderThanDays(tempFile.DateLastModified, oDate, minimumDays) Then
+			SafeDeleteFile tempFile.Path, True
+		End If
+	Next
+	For Each tempSubfolder In tempFolder.SubFolders
+		If IsOlderThanDays(tempSubfolder.DateLastModified, oDate, minimumDays) Then
+			SafeDeleteFolder tempSubfolder.Path, True
+		End If
+	Next
+End Sub
+
+Sub CleanOldMatchingFilesInFolder(folderPath, namePrefix, minimumDays)
+	Dim targetFolder, matchingFile
+	If Not oFSO.FolderExists(folderPath) Then Exit Sub
+	Set targetFolder = oFSO.GetFolder(folderPath)
+	For Each matchingFile In targetFolder.Files
+		If LCase(Left(matchingFile.Name, Len(namePrefix))) = LCase(namePrefix) Then
+			If IsOlderThanDays(matchingFile.DateLastModified, oDate, minimumDays) Then
+				SafeDeleteFile matchingFile.Path, True
+			End If
+		End If
+	Next
+End Sub
+
+Sub RunOptionalCCleaner
+	Dim candidates, candidate, ccleanerPath, returnCode
+	candidates = Array( _
+		oShell.ExpandEnvironmentStrings("%ProgramFiles%\CCleaner\CCleaner64.exe"), _
+		oShell.ExpandEnvironmentStrings("%ProgramFiles%\CCleaner\CCleaner.exe"), _
+		oShell.ExpandEnvironmentStrings("%ProgramFiles(x86)%\CCleaner\CCleaner.exe") _
+	)
+	ccleanerPath = ""
+	For Each candidate In candidates
+		If oFSO.FileExists(candidate) Then
+			ccleanerPath = candidate
+			Exit For
+		End If
+	Next
+
+	If Len(ccleanerPath) = 0 Then
+		oFile.WriteLine "CCleaner was requested but no supported executable was found."
+		Exit Sub
+	End If
+
+	oFile.WriteLine "WARNING: Running CCleaner Custom Clean with its saved options."
+	oFile.WriteLine "CCleaner's configured includes are outside ryddeScript repository protection."
+	returnCode = oShell.Run("""" & ccleanerPath & """ /AUTO", 1, True)
+	oFile.WriteLine "CCleaner completed with exit code " & returnCode & "."
+End Sub
 
 Sub LoadLibrary(libraryPath)
 	Dim libraryFile, librarySource

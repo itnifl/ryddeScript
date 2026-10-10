@@ -17,13 +17,28 @@ The script is organized as a sequential cleanup workflow. Its main concepts are:
 
 - **Discovery:** inspect the Windows version, architecture, registry, filesystem, and installed server roles before deciding whether a cleanup step applies.
 - **Retention rules:** identify selected temporary files, dumps, logs, and folders by age, size, name, or location.
+- **Repository protection:** reject deletion of the repository itself, anything inside it, or any ancestor directory containing it.
 - **Windows maintenance tools:** invoke utilities such as Disk Cleanup, DISM, `compact`, `powercfg`, and `vssadmin`.
 - **Modern Windows caches:** include Delivery Optimization files and the DirectX shader cache through Windows Disk Cleanup.
+- **Current-user temporary files:** remove top-level files and folders from `%TEMP%` only after they are at least seven days old.
 - **Server-role cleanup:** handle generic IIS, Exchange, and WSUS log or maintenance locations when present.
 - **Logging and reporting:** record attempted actions and compare free disk space before and after execution.
 - **Elevation:** relaunch through `cscript.exe` with administrative rights when required.
 
 Environment-specific product paths, private deployment conventions, personal names, credentials, machine names, and organization-specific cleanup rules are intentionally excluded from the public version.
+
+All direct file and folder deletions pass through a single repository-protection boundary. The boundary rejects the repository, its contents, ancestor folders, wildcard file deletions, and filesystem reparse points. Folder trees are traversed item by item without following junctions. Runtime logs are stored under `%ProgramData%\ryddeScript\Logs`, not in the checkout, and only logs created by ryddeScript are rotated.
+
+### Additional cleanup added
+
+- Current-account `%TEMP%` items are eligible only after seven days.
+- Font-cache files are eligible only after 30 days and are deleted through the protected wrapper.
+- Delivery Optimization and DirectX shader caches are included through Windows Disk Cleanup.
+- DISM component-store cleanup supports modern Windows versions.
+
+### Optional CCleaner
+
+CCleaner is never run by default. Supplying both `/execute` and `/ccleaner` runs CCleaner's supported `/AUTO` command, which uses the options already saved in Custom Clean and does not run Registry Cleaner. Review CCleaner's saved includes and exclusions first: external CCleaner rules cannot be constrained by ryddeScript's repository-protection wrapper. See [CCleaner's official command-line documentation](https://support.ccleaner.com/articles/en_US/Master_Article/command-line-parameters-for-ccleaner-for-windows).
 
 ### Important safety warning
 
@@ -59,6 +74,19 @@ GitHub Actions is configured to run both commands for every pull request and eve
 
 ### Historical invocation
 
+Supported arguments can be displayed at any time without elevation or system changes:
+
+```bat
+cscript //nologo ryddeScript.vbs /help
+```
+
+| Argument | Effect |
+| --- | --- |
+| No arguments | Display the non-destructive preview and argument list. |
+| `/execute` | Run the destructive legacy cleanup workflow. |
+| `/ccleaner` | Also run CCleaner Custom Clean; effective only with `/execute`. |
+| `/help` or `/?` | Display all supported arguments and exit without changes. |
+
 The safe default displays the execution plan without changing the machine:
 
 ```bat
@@ -71,7 +99,13 @@ After a complete code and safety review, the destructive legacy workflow can be 
 cscript //nologo ryddeScript.vbs /execute
 ```
 
-The `/execute` command documents the interface; it is not a recommendation to run the script on a real machine.
+CCleaner can additionally be requested with:
+
+```bat
+cscript //nologo ryddeScript.vbs /execute /ccleaner
+```
+
+The execution commands document the interface; they are not a recommendation to run the script on a real machine.
 
 ### Recommended modernization
 
@@ -85,7 +119,7 @@ The project is available under the [MIT License](LICENSE). Anyone may use, copy,
 
 **«Rydde» betyr å ordne eller gjøre rent. `ryddeScript` betyr derfor «ryddeskript».**
 
-Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det finner utvalgte midlertidige filer, logger og andre diskplasskrevende data. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/execute` må oppgis for å kjøre oppryddingen.
+Dette er et eldre VBScript fra 2015 for opprydding på Windows-maskiner og -servere. Det beskytter repoet og mapper som inneholder det, og kan rydde midlertidige filer som er eldre enn sju dager. Uten argumenter viser skriptet bare en trygg forhåndsvisning; `/help` viser alle argumenter, og `/execute` må oppgis for å kjøre oppryddingen. CCleaner kjøres bare når både `/execute` og `/ccleaner` er oppgitt, og bruker da CCleaners egne lagrede valg.
 
 Skriptet kan slette filer, profildata, skyggekopier, gjenopprettingspunkter og installasjonsbuffere. Det er historisk kode og er **ikke trygt å kjøre som publisert**. Les hele kildekoden, innfør en reell tørrkjøringsmodus, ta sikkerhetskopi og test i en midlertidig virtuell maskin først.
 
