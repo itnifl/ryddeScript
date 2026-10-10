@@ -29,6 +29,11 @@ AssertFalse CanDeletePath("C:\UsersBackup\Test", "C:\Users"), "Sibling prefix is
 AssertFalse CanDeletePath("D:\Users\Test", "C:\Users"), "Different drive is rejected"
 AssertFalse CanDeletePath("", "C:\Users"), "Empty candidate is rejected"
 
+AssertFalse IsDismComponentCleanupSupported("6.1.7601"), "Windows 7 and Server 2008 R2 use the legacy cleanup path"
+AssertTrue IsDismComponentCleanupSupported("6.2.9200"), "Windows 8 and Server 2012 support component cleanup"
+AssertTrue IsDismComponentCleanupSupported("10.0.26100"), "Windows 10 and 11 support component cleanup"
+AssertFalse IsDismComponentCleanupSupported("invalid"), "Invalid Windows versions are rejected"
+
 If failures > 0 Then
 	WScript.Echo failures & " of " & assertions & " decision tests failed."
 	WScript.Quit 1
